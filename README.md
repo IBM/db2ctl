@@ -1,4 +1,4 @@
-# DB2 orchestrator
+# db2ctl
 
 This will help generate pacemaker and corosync configurations, along with linbit.
 
