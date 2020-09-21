@@ -3,20 +3,20 @@
 TOOL=db2ctl
 
 # Determine the latest version by version number.
-if [ "x${DB2PC_VERSION}" = "x" ] ; then
-  DB2PC_VERSION=$(curl -sL https://api.github.com/repos/IBM/db2ctl/releases/latest | \
+if [ "x${DB2CTL_VERSION}" = "x" ] ; then
+  DB2CTL_VERSION=$(curl -sL https://api.github.com/repos/IBM/db2ctl/releases/latest | \
                   grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
-  DB2PC_VERSION="${DB2PC_VERSION##*/}"
+  DB2CTL_VERSION="${DB2CTL_VERSION##*/}"
 fi
 
 
-if [ "x${DB2PC_VERSION}" = "x" ] ; then
-  printf "Unable to get latest db2pc version. Set DB2PC_VERSION env var and re-run. For example: export DB2PC_VERSION=1.0.1"
+if [ "x${$DB2CTL_VERSION}" = "x" ] ; then
+  printf "Unable to get latest db2pc version. Set DB2CTL_VERSION env var and re-run. For example: export DB2CTL_VERSION=v0.0.5"
   exit;
 fi
 
-URL="https://github.com/IBM/db2ctl/releases/download/$DB2PC_VERSION/$TOOL"
-printf "\nDownloading %s from %s ..." "$DB2PC_VERSION" "$URL"
+URL="https://github.com/IBM/db2ctl/releases/download/$DB2CTL_VERSION/$TOOL"
+printf "\nDownloading %s from %s ..." "$DB2CTL_VERSION" "$URL"
 if [[ $EUID -eq 0 ]]; then
    curl -L -s $URL -o /usr/local/bin/$TOOL
    chmod +x /usr/local/bin/$TOOL
