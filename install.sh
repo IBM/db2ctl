@@ -10,7 +10,7 @@ if [ "x${DB2CTL_VERSION}" = "x" ] ; then
 fi
 
 
-if [ "x${$DB2CTL_VERSION}" = "x" ] ; then
+if [ "x${DB2CTL_VERSION}" = "x" ] ; then
   printf "Unable to get latest db2pc version. Set DB2CTL_VERSION env var and re-run. For example: export DB2CTL_VERSION=v0.0.5"
   exit;
 fi
