@@ -1,0 +1,39 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+log ================================================
+log Install essential yum packages on all hosts
+log ================================================
+
+cat << EOF > /tmp/cockpit.conf
+AllowUnencrypted=true
+EOF
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    log Install yum packages on $host
+    log ======================================================================== 
+    command="yum -y install rsync ksh pam.i686 libstdc++.i686 cockpit cockpit-dashboard cockpit-machines cockpit-storaged"
+    log Run command on $host -- $command
+    $SSH $host "$command"  
+    RC=$?
+    test $? -eq 0 || exit 1
+done
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  log ========================================================================
+  log Copy cockpit.conf to host $host
+  $SCP -p /tmp/cockpit.conf $host:/etc/cockpit/cockpit.conf
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

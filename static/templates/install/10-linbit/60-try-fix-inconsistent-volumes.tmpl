@@ -1,0 +1,49 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+log ========================================================================
+log "Fix Inconsistent Volumes, if any"
+log ========================================================================
+
+command="curl -s -X GET http://{{$firstHost}}:3370/v1/view/resources"
+log Run command on {{$firstHost}} -- $command
+HOSTS=($($SSH {{$firstHost}} "$command | jq -r '.[].node_name'"))
+VOLS=($($SSH {{$firstHost}} "$command | jq -r '.[].name'"))
+STATUS=($($SSH {{$firstHost}} "$command | jq -r '.[].volumes[].state.disk_state'"))
+log ========================================================================
+
+for ((i=0; i<${#HOSTS[@]}; i++))
+do 
+   if [ "${STATUS[i]}" != "Diskless" ] ; then
+      if [ "${STATUS[i]}" = "Inconsistent" ] ; then 
+        command="drbdadm primary ${VOLS[i]} --force"
+        log Run command on ${HOSTS[i]} -- $command
+        $SSH ${HOSTS[i]} "$command"
+        command="drbdadm secondary ${VOLS[i]}"
+        log Run command on ${HOSTS[i]} -- $command
+        $SSH ${HOSTS[i]} "$command"
+        log ========================================================================
+      fi
+   fi
+done
+
+log ========================================================================
+log List all resources
+log ========================================================================
+command="linstor r l -p"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && echo RC=1 || echo RC=0
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

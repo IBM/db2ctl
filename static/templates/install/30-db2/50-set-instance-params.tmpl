@@ -1,0 +1,91 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+log ================================================
+log "Set Db2 Instance {{.Spec.DB2.Required.InstanceName}} parameters"
+log ================================================
+
+DB2VERSION={{.Spec.DB2.Required.DB2Version}}
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+INST_NAME={{.Spec.DB2.Required.InstanceName}}
+NUM_INSTANCE={{.Spec.DB2.Required.NumInstances}}
+INSTANCE_MEMORY=$((94/NUM_INSTANCE))
+NUMDB={{.Spec.DB2.Required.NumDB}}
+{{- $role := .Spec.DB2.Required.Role}}
+
+{{- if eq $role "optimized"}}
+CONN_ELAPSE=5
+{{- else}}
+CONN_ELAPSE=30
+{{- end}}
+
+command="id -u $INST_NAME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+if [ $? -ne 0 ] ; then
+   log "Instance user $INST_NAME does not exist."
+   exit 1
+fi  
+
+homeHost=$(hostname)
+cat << EOF > /tmp/set-instance-$INST_NAME-parameters
+#!/bin/bash
+su - $INST_NAME
+echo ================================================
+echo "Set instance_usage to dashdb"
+echo ================================================
+db2 -v update dbm cfg using instance_usage dashdb
+echo ================================================
+echo "Set instance_memnory based upon Optimized/Sandbox"
+echo ================================================
+db2 -v update dbm cfg using instance_memory $INSTANCE_MEMORY
+echo ================================================
+echo "Move logs from NFS sqllib to NODE Dir"
+echo ================================================
+db2 -v update dbm cfg using DIAGPATH '"{{.Spec.DB2.Optional.TopLevelDir}}/{{.Spec.DB2.Required.InstanceName}} \$n/db2dump"'
+echo ================================================
+echo "Configure alt diag path in case of a failure of current diag path"
+echo ================================================
+db2 -v update dbm cfg using ALT_DIAGPATH '"/altdiag/{{.Spec.DB2.Required.InstanceName}} \$n/db2dump"'
+echo ================================================
+echo "Set numdb to a value of $NUMDB"
+echo ================================================
+db2 -v "update dbm cfg using NUMDB $NUMDB"
+echo ================================================
+db2 -v "update dbm cfg using CONN_ELAPSE $CONN_ELAPSE"
+echo ================================================
+exit
+exit
+EOF
+
+log "Create /altdiag in case access to current diag becomes unavailable"
+log ======================================================================== 
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    log ======================================================================== 
+    command="mkdir -p /altdiag/{{.Spec.DB2.Required.InstanceName}} ; chown $INST_NAME.$INST_NAME /altdiag/{{.Spec.DB2.Required.InstanceName}}"
+    log Run command on $host -- $command
+    $SSH $host "$command"
+done
+
+log "Set db2 instance parameters"
+log ======================================================================== 
+cat /tmp/set-instance-$INST_NAME-parameters
+
+for host in {{$firstHost}}
+do
+    log Install Db2 license on $host 
+    log ======================================================================== 
+    $SSH -tt $host "/bin/bash -s" -- </tmp/set-instance-$INST_NAME-parameters
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

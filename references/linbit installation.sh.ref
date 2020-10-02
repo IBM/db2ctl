@@ -1,0 +1,210 @@
+#!/bin/bash
+
+## Nodes
+linstor node create db2-pc-test-1-01.fyre.ibm.com
+linstor node create db2-pc-test-1-02.fyre.ibm.com
+linstor node create db2-pc-test-1-03.fyre.ibm.com
+linstor node create db2-pc-test-1-04.fyre.ibm.com
+
+
+## Volume group
+linstor physical-storage create-device-pool --pool-name vg_db2 --storage-pool NVMEs LVM db2-pc-test-1-01.fyre.ibm.com /dev/vdb /dev/vdc /dev/vdd /dev/vde
+linstor physical-storage create-device-pool --pool-name vg_db2 --storage-pool NVMEs LVM db2-pc-test-1-02.fyre.ibm.com /dev/vdb /dev/vdc /dev/vdd /dev/vde
+linstor physical-storage create-device-pool --pool-name vg_db2 --storage-pool NVMEs LVM db2-pc-test-1-03.fyre.ibm.com /dev/vdb /dev/vdc /dev/vdd /dev/vde
+linstor physical-storage create-device-pool --pool-name vg_db2 --storage-pool NVMEs LVM db2-pc-test-1-04.fyre.ibm.com /dev/vdb /dev/vdc /dev/vdd /dev/vde
+
+## Display
+linstor sp l
+
+# Define stripe size so that volumes are striped across all NVMes
+
+for N in db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-02.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com db2-pc-test-1-04.fyre.ibm.com
+do 
+  linstor sp set-property $N NVMEs StorDriver/LvcreateOptions '--stripes 8 --stripesize 4M'
+done
+
+# Generate LinBit Volumes
+
+## Create resource group for 2-way replication
+linstor resource-group create --storage-pool NVMes --place-count 2 red2_NVME
+
+## Set resource group properties
+linstor resource-group set-property red2_NVME PeerSlotsNewResource 3
+
+## Create volume group
+
+linstor volume-group create red2_NVME
+
+## Create volumes for MLNs
+for N in {00..23}
+do
+   linstor rd c --resource-group red2_NVME NODE00${N}
+done
+
+## Create volume resource definition for diag logs
+for N in {00..23}
+do
+   linstor rd c --resource-group red2_NVME DIAG00${N}
+done
+
+## Create volume defintion for MLNs
+SIZE=5GB
+MINOR=1000
+for N in {00..23}
+do
+   linstor volume-definition create --minor $MINOR NODE00${N} $SIZE
+   MINOR=$((MINOR+1))
+done
+
+## Create volume definition for diag logs
+SIZE=1GB
+MINOR=2000
+for N in {00..23}
+do
+   linstor volume-definition create --minor $MINOR DIAG00${N} $SIZE
+   MINOR=$((MINOR+1))
+done
+
+## Create volume resource and place replica for MLNs
+
+linstor resource create db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-02.fyre.ibm.com NODE0000 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-02.fyre.ibm.com NODE0001 --storage-pool NVMEs
+
+linstor resource create db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com NODE0002 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com NODE0003 --storage-pool NVMEs
+
+linstor resource create db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-04.fyre.ibm.com NODE0004 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-04.fyre.ibm.com NODE0005 --storage-pool NVMEs
+
+linstor resource create db2-pc-test-1-02.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com NODE0006 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-02.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com NODE0007 --storage-pool NVMEs
+
+linstor resource create db2-pc-test-1-02.fyre.ibm.com db2-pc-test-1-04.fyre.ibm.com NODE0008 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-02.fyre.ibm.com db2-pc-test-1-04.fyre.ibm.com NODE0009 --storage-pool NVMEs
+
+linstor resource create db2-pc-test-1-02.fyre.ibm.com db2-pc-test-1-01.fyre.ibm.com NODE0010 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-02.fyre.ibm.com db2-pc-test-1-01.fyre.ibm.com NODE0011 --storage-pool NVMEs
+
+linstor resource create db2-pc-test-1-03.fyre.ibm.com db2-pc-test-1-04.fyre.ibm.com NODE0012 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-03.fyre.ibm.com db2-pc-test-1-04.fyre.ibm.com NODE0013 --storage-pool NVMEs
+
+linstor resource create db2-pc-test-1-03.fyre.ibm.com db2-pc-test-1-01.fyre.ibm.com NODE0014 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-03.fyre.ibm.com db2-pc-test-1-01.fyre.ibm.com NODE0015 --storage-pool NVMEs
+
+linstor resource create db2-pc-test-1-03.fyre.ibm.com db2-pc-test-1-02.fyre.ibm.com NODE0016 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-03.fyre.ibm.com db2-pc-test-1-02.fyre.ibm.com NODE0017 --storage-pool NVMEs
+
+linstor resource create db2-pc-test-1-04.fyre.ibm.com db2-pc-test-1-01.fyre.ibm.com NODE0018 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-04.fyre.ibm.com db2-pc-test-1-01.fyre.ibm.com NODE0019 --storage-pool NVMEs
+
+linstor resource create db2-pc-test-1-04.fyre.ibm.com db2-pc-test-1-02.fyre.ibm.com NODE0020 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-04.fyre.ibm.com db2-pc-test-1-02.fyre.ibm.com NODE0021 --storage-pool NVMEs
+
+linstor resource create db2-pc-test-1-04.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com NODE0022 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-04.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com NODE0023 --storage-pool NVMEs
+
+
+## DIAG
+TODO - similar to NODE
+
+## Temporary table space not replicated volumes
+linstor resource-group create --storage-pool NVMEs --layer-list storage local_NVME
+
+linstor volume-group create local_NVME
+linstor rd c --resource-group local_NVME --layer-list storage DB2LOCAL
+linstor vd c DB2LOCAL 10GB
+
+linstor r c --storage-pool NVMEs --layer-list storage db2-pc-test-1-01.fyre.ibm.com DB2LOCAL
+linstor r c --storage-pool NVMEs --layer-list storage db2-pc-test-1-02.fyre.ibm.com DB2LOCAL
+linstor r c --storage-pool NVMEs --layer-list storage db2-pc-test-1-03.fyre.ibm.com DB2LOCAL
+linstor r c --storage-pool NVMEs --layer-list storage db2-pc-test-1-04.fyre.ibm.com DB2LOCAL
+
+## Create the 4 way replicated volume for the NFS share.
+linstor rd c --resource-group red2_NVME nfs
+linstor vd create --minor 3000 nfs 1GB
+linstor r c --storage-pool NVMEs --auto-place 4 nfs
+
+
+## List all volume resources
+linstor r l -p
+
+# Create file system on each volume
+
+## Create xfs file system for NODE and DIAG
+SPNAME=NVMEs
+HOSTS=(db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-02.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com db2-pc-test-1-04.fyre.ibm.com)
+NUM_HOSTS=${#HOSTS[@]}
+TOTAL_MLN=24
+PER_HOST_MLN=$((TOTAL_MLN/NUM_HOSTS))
+NLEVEL=/db2db/db2wh
+DLEVEL=/db2db/logs
+FTYPE=NODE00
+
+S=0
+E=$((S+PER_HOST_MLN-1))
+for host in ${HOSTS[@]}
+do
+   for n in $(seq $S $E)
+   do
+      nn=$((n+1000))
+      nd=$((n+2000))
+      DIR_NODE=$(printf "NODE00%02d" $n)
+      DIR_DIAG=$(printf "DIAG00%02d" $n)
+      DEV_NODE=$(printf "/dev/drbd%04d" $nn)
+      DEV_DIAG=$(printf "/dev/drbd%04d" $nd)
+      echo Creating $NODE_DIR and $DIAG_DIR dir in $host
+      ssh $host "mkdir -p $NLEVEL/$NODE ; mkdir -p $DLEVEL/$DIAG"
+      echo "Creating xfs on $DEV_NODE"
+      ssh $host "mkfs -V -t xfs -d su=4096k,sw=8 -f $DEV_NODE"
+      echo "Creating xfs on $DEV_DIAG"
+      ssh $host "mkfs -V -t xfs -d su=4096k,sw=8 -f $DEV_DIAG"
+   done
+   S=$((E+1))
+   E=$((S+PER_HOST_MLN-1))
+done
+
+## Create xfs for DB2LOCAL
+
+TLEVEL=/db2db
+
+for host in ${HOSTS[@]}
+do
+   block=$(linstor v l -p | grep $host | grep DB2LOCAL | awk -F "|" '{print $7}')
+   echo Create $TLEVEL/DB2LOCAL for $block on $host
+   ssh $host "mkdir -p $TLEVEL/DB2LOCAL"
+   ssh $host "mkfs -V -t xfs -d su=4096k,sw=8 -f $block"
+done
+
+
+## Create /etc/fstab for DB2LOCAL
+for host in ${HOSTS[@]}
+do
+      ssh -T $host <<'EOSSH'
+        TLEVEL=/db2db
+        host=$(hostname -s)
+        dir=$TLEVEL/DB2LOCAL
+        block=$(linstor v l -p | grep $host | grep DB2LOCAL | awk -F "|" '{print $7}')
+        TABENTRY=$(printf "$block    $dir    xfs defaults 0 0\n")
+        if ! grep -q $block /etc/fstab
+        then
+          echo "Adding entry $TABENTRY"
+          echo $TABENTRY >> /etc/fstab
+        else
+          echo "Already exists"
+        fi
+EOSSH
+done
+
+
+# DRBD tuning
+
+## Enabling read-balancing
+linstor resource-group drbd-options --read-balancing least-pending red2_NVME
+
+## Reduce meta-data write accesses
+linstor resource-group drbd-options --al-extents 6433 red2_NVME
+
+## Disable explicit flush operations 
+linstor resource-group drbd-options --disk-flushes no red2_NVME
+
+

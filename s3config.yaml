@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Configuration
+metadata: 
+  name: IBM S3 COS Configuration Details
+spec:
+  uploadFile:
+    keyName: "v1/v11.5.4_linuxx64_server.tar.gz"
+    name: "/Users/vikram/db2-binaries/v11.5.4_linuxx64_server.tar.gz"
+    log: "upload.log"
+  s3:
+    apiKey: "" 
+    serviceInstanceID: "crn:v1:bluemix:public:cloud-object-storage:global:a/981dfc6d2ea8df61927c9f6831cfc1b2:0df09b23-7c7d-4149-8a52-ec65bf19e9cc::"
+    authEndpoint: "https://iam.cloud.ibm.com/identity/token"
+    serviceEndpoint: "https://s3.us-east.cloud-object-storage.appdomain.cloud"
+    bucketLocation: "us-east"
+    bucketName : "db2ctl-files"
+    partSize: 52428800 #PARTSIZE
+  downloadFile:
+    prefix: "v1/"
+    name: ""
+    log: "download.log"

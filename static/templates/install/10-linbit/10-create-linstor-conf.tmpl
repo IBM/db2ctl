@@ -1,0 +1,93 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+log ========================================================================
+log Create linstor-client conf on the first node
+log ========================================================================
+
+cat << 'EOT' > /tmp/linstor-client.conf
+[global]
+controllers={{getFirstHost .Spec.Nodes.Required.NamesAsList}}
+EOT
+
+log Copy file over to all nodes
+log ========================================================================
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   command="mkdir -p /etc/linstor"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   command="$SCP /tmp/linstor-client.conf $host:/etc/linstor"
+   log Run command -- $command
+   $command
+   test $? -ne 0 && RC=1
+   log ========================================================================
+done
+
+log Enable linstor controller on first node
+log ========================================================================
+command="systemctl enable linstor-controller"
+log Run command on {{getFirstHost .Spec.Nodes.Required.NamesAsList}} -- $command
+$SSH {{$firstHost}} "$command"
+log ========================================================================
+
+command="systemctl start linstor-controller"
+log Run command on {{getFirstHost .Spec.Nodes.Required.NamesAsList}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+
+log ========================================================================
+log Enable linstor-satellte on all nodes
+log ========================================================================
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    command="systemctl enable linstor-satellite"
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    log ========================================================================
+
+    command="systemctl start linstor-satellite"
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    test $? -ne 0 && RC=1
+    log ========================================================================
+
+    command="systemctl status linstor-satellite | grep Active"
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    log ========================================================================
+done
+
+sleep 5
+
+log Create LinStor nodes
+log ======================================================================== 
+
+{{- range $host := .Spec.Nodes.Required.Names}}
+command="linstor node create {{$host}}"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+log ======================================================================== 
+{{- end}}
+
+log List LinStor nodes
+log ======================================================================== 
+command="linstor node list"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

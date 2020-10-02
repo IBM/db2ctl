@@ -1,0 +1,73 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+if rpm -q jq ; then 
+   echo "jq package is available"
+else 
+   yum -y install jq
+fi
+
+# One of the disk disk must be in UpToDate state. 
+# The seond disk can be inconsistent as it might be still in the 
+# process of sync target and it is not an error.
+# The third disk is the quorum and acts like a quorum fisk.
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+log ========================================================================
+log DRBD Volumes Sanity Check
+log ========================================================================
+
+## Check NODE
+
+{{- $replicated := .Spec.DB2.Required.Replicated}}
+{{- range $val1 := .DataToNode}}
+{{- if $replicated}}
+command="curl -s -X GET http://{{$firstHost}}:3370/v1/view/resources?resources={{$val1.DBPrimitiveName}}"
+#log Run command -- $command
+RESULTS=$($command | jq -r '.[].volumes[].state.disk_state')
+LRC=1
+for result in $RESULTS
+do 
+   if [ "$result" = "UpToDate" ] ; then 
+      LRC=0
+      break
+   fi
+done
+test $LRC -eq 0 && log "Status of volume -- {{$val1.DBPrimitiveName}}=OK" || echo "Status of disk {{$val1.DBPrimitiveName}}=Inconsistent"
+if [ $LRC -eq 1 ] ; then
+   RC=1
+fi   
+log ========================================================================
+{{- end}}
+{{- end}}
+
+# Check nfs
+
+command="curl -s -X GET http://{{$firstHost}}:3370/v1/view/resources?resources=nfs"
+#log Run command -- $command
+RESULTS=$($command | jq -r '.[].volumes[].state.disk_state')
+LRC=1
+for result in $RESULTS
+do 
+   if [ "$result" = "UpToDate" ] ; then 
+      LRC=0
+      break
+   fi
+done
+test $LRC -eq 0 && log "Status of volume -- nfs=OK" || echo "Status of volumr -- nfs=Inconsistent"
+if [ $LRC -eq 1 ] ; then
+   RC=1
+fi  
+log ========================================================================
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

@@ -1,0 +1,57 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+INST_NAME={{.Spec.DB2.Required.InstanceName}}
+TOTAL_PARTITIONS={{.Spec.Nodes.Required.Partitions}}
+
+log ================================================
+log "Start Db2 instance $INST_NAME"
+log ================================================
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+command="id -u $INST_NAME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+if [ $? -ne 0 ] ; then
+   log "Instance user $INST_NAME does not exist."
+   exit 1
+fi  
+
+cat << EOF > /tmp/startinstance
+su - $INST_NAME
+db2_kill 2>&1 > /dev/null
+for (( c=0; c<$TOTAL_PARTITIONS; c++ ))
+do
+    ipclean 2>&1 > /dev/null
+done
+for (( c=0; c<$TOTAL_PARTITIONS; c++ ))
+do
+    db2start \$c
+done
+db2pd -dbmcfg | grep -i instance
+exit
+exit
+EOF
+
+log "Command used for starting db2 instance"
+log ======================================================================== 
+cat /tmp/startinstance
+
+for host in {{$firstHost}}
+do
+    log Start instance on $host 
+    log ======================================================================== 
+    $SSH -tt $host "/bin/bash -s" -- </tmp/startinstance
+    log ======================================================================== 
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

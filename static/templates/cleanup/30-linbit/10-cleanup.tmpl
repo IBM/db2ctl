@@ -1,0 +1,163 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+start=$SECONDS
+
+log ========================================================================
+log CLEANUP LINBIT
+log ========================================================================
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+{{- $replicated := .Spec.DB2.Required.Replicated}}
+
+command="crm_resource -l"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command" 2>/dev/null
+if [ $? -eq 0 ] ; then
+   log "Error: We should not clean LinBit so long Pacemaker resources are active."
+   log "Info: May be, you should cleanup Pacemaker first."
+   exit 1
+fi
+
+command="systemctl stop linstor-controller"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  TLD={{.Spec.DB2.Optional.TopLevelDir}}
+  {{- if $replicated}}
+  command="grep -qs '{{.Spec.DB2.Optional.TopLevelDir}}/DB2LOCAL' /proc/mounts && umount {{.Spec.DB2.Optional.TopLevelDir}}/DB2LOCAL || echo 'DB2LOCAL Not Mounted'"
+  {{- else}}
+  command="grep -qs '{{.Spec.DB2.Optional.TopLevelDir}}' /proc/mounts && umount {{.Spec.DB2.Optional.TopLevelDir}} || echo '{{.Spec.DB2.Optional.TopLevelDir}} Not Mounted'"
+  {{- end}}
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ========================================================================
+
+  {{- if $replicated}}
+  command="systemctl disable ${TLD#/}-DB2LOCAL.mount ; /bin/rm -f /etc/systemd/system/${TLD#/}-DB2LOCAL.mount"
+  {{- else}}
+  command="systemctl disable ${TLD#/}.mount ; /bin/rm -f /etc/systemd/system/${TLD#/}.mount"
+  {{- end}}
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ========================================================================
+
+  command="systemctl stop linstor-satellite"
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ========================================================================
+
+  command="drbdadm down all"
+  log Run command on $host -- $command 
+  $SSH $host "$command"
+  log ========================================================================
+
+  command="yes yes | drbdadm wipe-md all"
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ========================================================================
+
+  vgdisplay | grep 'cl' && echo found || echo not foun
+  command="vgdisplay | grep 'vg_db2' && vgremove -f vg_db2 || echo 'vg_db2 volume group not found'"
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ========================================================================
+
+  command="rm -rf /var/lib/linstor ; rm -rf /var/lib/linstor.d ; rm -f /etc/linstor/linstor-client.conf"
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+
+  command="umount -f /misc/nfsshare"
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+done
+
+log Wipefs on all NVMe drives
+log ========================================================================
+{{- range $node, $nodeInfo := .Spec.Nodes.Required.NodeInfoMap}}
+command="wipefs -a --force {{$nodeInfo.NVMEList}}"
+log Run command on {{$node}} -- $command
+$SSH {{$node}} "$command"
+log ========================================================================
+{{- end}}
+
+cat <<'EOF' > /tmp/clean-nvme-leftover-lvm
+#!/bin/bash
+echo ========================================================================
+lsblk
+echo ========================================================================
+dmsetup info -C | grep -qs vg_db2
+if [ $? -eq 0 ] ; then
+   ORPHANLVM=$(dmsetup info -C | grep vg_db2 | awk '{print $1}')
+   for lvm in $ORPHANLVM
+   do
+      echo ========================================================================
+      echo "Running command -- dmsetup remove --force $lvm"
+      dmsetup remove --force $lvm
+   done
+fi
+cat /proc/mounts | grep -E "^/dev/drbd"
+if [ $? -eq 0 ] ; then
+   ORPHANDRBD=$(cat /proc/mounts | grep -E "^/dev/drbd" | awk '{print $1}')
+   for drbd in $ORPHANDRBD
+   do
+      echo ========================================================================
+      echo "Running command -- umount -f $drbd"
+      umount -f $drbd
+   done
+fi
+cat /etc/mtab | grep -E "^/dev/drbd"
+if [ $? -eq 0 ] ; then
+   sed -i -e '/^\/dev\/drbd/d' /etc/mtab
+fi
+cat /proc/mounts | grep -E "^/dev/drbd"
+if [ $? -eq 0 ] ; then
+   ORPHANDRBD=$(cat /proc/mounts | grep -E "^/dev/drbd" | awk '{print $1}')
+   for drbd in $ORPHANDRBD
+   do
+      echo "Second retry to remove Ghost volumes"
+      echo ========================================================================
+      echo "Running command -- umount -f $drbd"
+      umount -f $drbd
+      if [ $? -ne 0 ] ; then
+         echo "Ghost DRBD volumes are present. Reboot of this host $(hostname) is required"
+         RC=1
+      fi   
+   done
+fi
+echo ========================================================================
+lsblk
+EOF
+
+log "Wipefs leftover vg_db2 LVMs if there was an issue with cleanup"
+log ========================================================================
+{{- range $node, $nodeInfo := .Spec.Nodes.Required.NodeInfoMap}}
+log Run /tmp/clean-nvme-leftover-lvm on {{$node}}
+$SSH {{$node}} "/bin/bash -s" -- </tmp/clean-nvme-leftover-lvm
+log ========================================================================
+{{- end}}
+
+command="systemctl start linstor-controller"
+log Run command on {{getFirstHost .Spec.Nodes.Required.NamesAsList}} -- $command
+log ========================================================================
+$SSH {{$firstHost}} "$command"
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}; 
+do  
+  command="systemctl start linstor-satellite"   
+  log Run command on $host -- $command 
+  log ========================================================================
+  $SSH $host "$command"; 
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

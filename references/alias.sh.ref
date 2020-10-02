@@ -1,0 +1,21 @@
+#!/bin/bash
+
+alias dfh='runall "df -h | grep NODE | sort"'
+alias dft='runall "df -h | grep DB2LOCAL"'
+alias dfn='runall "df -h | grep nfs | sort"'
+alias dfd='runall "df -h | grep DIAG | sort"'
+
+alias ..='cd ..'
+alias ...='cd ../..'
+alias cd..='cd ..'
+alias ls-l='ls -l'
+alias ltr='ls -ltr'
+alias ls='ls -l --color=none'
+alias l='ls -ltr'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias grep='grep --color=auto'
+alias rehash='hash -r'
+alias unmount='echo "Error: Try the command: umount" 1>&2; false'
+alias psdb2='runall "ps -ef | grep db2sys[c]"'
+alias d="dig +search +noall +answer $1"

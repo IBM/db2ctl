@@ -1,0 +1,70 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+log ================================================
+log Copy kernel tuning parameters on all hosts
+log ================================================
+
+homeHost=$(hostname)
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+DB2VERSION={{.Spec.DB2.Required.DB2Version}}
+
+log "Get /etc/sysctl.conf from {{$firstHost}} to $homeHost"
+command="$SCP {{$firstHost}}:/etc/sysctl.conf /tmp"
+log Run command on $homeHost -- $command
+$command  
+
+grep -qxF 'net.ipv4.tcp_sack' /tmp/sysctl.conf || echo "net.ipv4.tcp_sack = 0" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_syncookies' /tmp/sysctl.conf || echo "net.ipv4.tcp_syncookies = 1" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_synack_retries' /tmp/sysctl.conf || echo "net.ipv4.tcp_synack_retries = 2" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_syn_retries' /tmp/sysctl.conf || echo "net.ipv4.tcp_syn_retries = 8" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_tw_reuse' /tmp/sysctl.conf || echo "net.ipv4.tcp_tw_reuse = 1" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_tw_recycle' /tmp/sysctl.conf || echo "net.ipv4.tcp_tw_recycle = 1" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_low_latency' /tmp/sysctl.conf || echo "net.ipv4.tcp_low_latency = 1" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_max_syn_backlog' /tmp/sysctl.conf || echo "net.ipv4.tcp_max_syn_backlog = 8192" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_timestamps' /tmp/sysctl.conf || echo "net.ipv4.tcp_timestamps = 0" >> /tmp/sysctl.conf
+grep -qxF 'vm.min_free_kbytes' /tmp/sysctl.conf || echo "vm.min_free_kbytes = 512000" >> /tmp/sysctl.conf
+grep -qxF 'kernel.numa_balancing' /tmp/sysctl.conf || echo "kernel.numa_balancing = 0" >> /tmp/sysctl.conf
+grep -qxF 'kernel.shmmax' /tmp/sysctl.conf || echo "kernel.shmmax = 13743895347" >> /tmp/sysctl.conf
+grep -qxF 'kernel.sysrq' /tmp/sysctl.conf || echo "kernel.sysrq = 1" >> /tmp/sysctl.conf
+grep -qxF 'net.core.rmem_default' /tmp/sysctl.conf || echo "net.core.rmem_default = 16777216" >> /tmp/sysctl.conf
+grep -qxF 'net.core.rmem_max' /tmp/sysctl.conf || echo "net.core.rmem_max = 8388608" >> /tmp/sysctl.conf
+grep -qxF 'net.core.wmem_max' /tmp/sysctl.conf || echo "net.core.wmem_max = 16777216" >> /tmp/sysctl.conf
+grep -qxF 'net.core.optmem_max' /tmp/sysctl.conf || echo "net.core.optmem_max = 16777216" >> /tmp/sysctl.conf
+grep -qxF 'net.core.rmem_max' /tmp/sysctl.conf || echo "net.core.rmem_max = 16777216" >> /tmp/sysctl.conf
+grep -qxF 'net.core.somaxconn' /tmp/sysctl.conf || echo "net.core.somaxconn = 10000" >> /tmp/sysctl.conf
+grep -qxF 'net.core.netdev_max_backlog' /tmp/sysctl.conf || echo "net.core.netdev_max_backlog = 300000" >> /tmp/sysctl.conf
+grep -qxF 'net.core.netdev_budget' /tmp/sysctl.conf || echo "net.core.netdev_budget = 600" >> /tmp/sysctl.conf
+grep -qxF 'net.core.wmem_default' /tmp/sysctl.conf || echo "net.core.wmem_default = 16777216" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_rmem' /tmp/sysctl.conf || echo "net.ipv4.tcp_rmem = 4096 4224000 16777216" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_wmem' /tmp/sysctl.conf || echo "net.ipv4.tcp_wmem = 4096 4224000 16777216" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_keepalive_time' /tmp/sysctl.conf || echo "net.ipv4.tcp_keepalive_time = 10" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_keepalive_intvl' /tmp/sysctl.conf || echo "net.ipv4.tcp_keepalive_intvl = 6" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_keepalive_probes' /tmp/sysctl.conf || echo "net.ipv4.tcp_keepalive_probes = 5" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_slow_start_after_idle' /tmp/sysctl.conf || echo "net.ipv4.tcp_slow_start_after_idle = 0" >> /tmp/sysctl.conf
+grep -qxF 'net.ipv4.tcp_adv_win_scale' /tmp/sysctl.conf || echo "net.ipv4.tcp_adv_win_scale = 2" >> /tmp/sysctl.conf
+EOF
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    log Copy kernel tuning params to $host 
+    log ======================================================================== 
+
+    command="$SCP /tmp/sysctl.conf $host:/etc/"
+    log Run command on $homeHost -- $command
+    $command  
+    command="sysctl -p"
+    log Run command on $host -- $command
+    $SSH $host "$command"
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

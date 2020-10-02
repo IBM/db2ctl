@@ -1,0 +1,37 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+INSTANCENAME={{.Spec.DB2.Required.InstanceName}}
+DB2VERSION={{.Spec.DB2.Required.DB2Version}}
+
+log ========================================================================
+log "Drop Db2 instance $INSTANCENAME"
+log ========================================================================
+
+command="db2 list db directory"
+log Run command on {{$firstHost}} -- $command
+RESPONSE=$($SSH {{$firstHost}} "su - $INSTANCENAME -c \"$command\"" 2>&1 | grep "Database name" | awk -F "=" '{print $2}')
+if [ "x$RESPONSE" == "x" ] ; then
+  log "Drop instance since no other databases were found"
+  $SSH {{$firstHost}} "/opt/ibm/db2/$DB2VERSION/bin/db2gcf -i {{.Spec.DB2.Required.InstanceName}} -s"
+  if [ $? -eq 0 ] ; then
+     command="/opt/ibm/db2/$DB2VERSION/instance/db2idrop {{.Spec.DB2.Required.InstanceName}}"
+     log Run command on {{$firstHost}} -- "$command"
+     $SSH {{$firstHost}} $command
+     if [ $? -ne 0 ] ; then
+        log "Error: Dropping the instance $INSTANCENAME"
+        #RC=1
+     fi
+  fi
+fi
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

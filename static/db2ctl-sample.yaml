@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Configuration
+metadata:
+  name: db2 pacemaker corosync configuration
+  clusterName: db2whcluster
+spec:
+  db2:
+    required:
+      role: optimized # optimized or sandbox
+      replicated: true # true or false
+      databaseName: BLUDB
+      instancePort: 50000
+      instanceName: db2wh
+      instanceID: 3000 # user id for the instance user when we create the user
+      instanceGD: 3000 # group id for instance user when we create the group
+      fencedID: 4000 # user id for the fenced user when we create the user
+      fencedGD: 4000 # group id for fenced user when we create the group
+      instanceSecret: cGFzc3dvcmQ= # replace with your base64 encoded password, echo -n 'password' | base64 
+      fencedName: db2fenc1
+      fencedSecret: cGFzc3dvcmQ= # replace with your base64 encoded password, echo -n 'password' | base64 
+      db2Version: 11.5.4.0 # Replace with your name
+      db2Binary: v11.5.4_linuxx64_server.tar.gz # Replace with your name
+      db2License: db2adv_vpc.lic # Replace with your name
+      numInstances: 1
+      numdb: 1
+      organization: row
+    # optional: - optional fields can be over-written if included in this file
+    #   topLevelDir: /db2db
+  nodes:
+    required:
+      numNodes: 4 #Example: 4, 8, 12 16 etc.
+      nvmeList: [[{name: /dev/xvdc, size: 25GB}, {name: /dev/xvde, size: 25GB}, {name: /dev/xvdf, size: 25GB}, {name: /dev/xvdg, size: 25GB}], [{name: /dev/xvdc, size: 25GB}, {name: /dev/xvde, size: 25GB}, {name: /dev/xvdf, size: 25GB}, {name: /dev/xvdg, size: 25GB}], [{name: /dev/xvdc, size: 25GB}, {name: /dev/xvde, size: 25GB}, {name: /dev/xvdf, size: 25GB}, {name: /dev/xvdg, size: 25GB}], [{name: /dev/xvdc, size: 25GB}, {name: /dev/xvde, size: 25GB}, {name: /dev/xvdf, size: 25GB}, {name: /dev/xvdg, size: 25GB}]] # GB or TB only
+      ipAddresses: [10.11.1.134, 10.11.1.135, 10.11.1.242, 10.11.2.20] #Example: [10.xx.xx.xx, 10.xx.xx.xx, ...]
+      names: [db2-pc-test-1-01.fyre.ibm.com, db2-pc-test-1-02.fyre.ibm.com, db2-pc-test-1-03.fyre.ibm.com, db2-pc-test-1-04.fyre.ibm.com] #Example: [e1n1, e2n1, ...]
+      partitions: 24
+  nfs:
+    server:
+      required: 
+        nfsVirtualIP: 10.11.1.2
+        cidrNetmask: 20
+        nic: eth0
+    # optional fields
+      # optional:
+      #   primitiveName: mynfsserver
+      #   nfsPath: /mnt/nfs/nfsserver
+    # client:
+    #   optional:

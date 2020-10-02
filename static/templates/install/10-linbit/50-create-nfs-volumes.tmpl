@@ -1,0 +1,40 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+log ========================================================================
+log Create the 4 way replicated NFS volume
+log ========================================================================
+
+log ========================================================================
+command="linstor rd c --resource-group red2_NVME nfs"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+log ========================================================================
+
+command="linstor vd create --minor {{.Spec.Linbit.Optional.VolumeDefinition.NFS.Minor}} nfs {{.Spec.Linbit.Optional.VolumeDefinition.NFS.Size}}"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+log ========================================================================
+
+{{- range $node := .Spec.NFS.Server.Required.NodesForPlacement}}
+command="linstor r c {{$node}} nfs --storage-pool NVMEs"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+log ========================================================================
+{{- end}}
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

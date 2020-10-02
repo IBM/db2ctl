@@ -1,0 +1,87 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+INST_NAME={{.Spec.DB2.Required.InstanceName}}
+DB_NAME={{.Spec.DB2.Required.DatabaseName}}
+TLD={{.Spec.DB2.Optional.TopLevelDir}}
+
+log ================================================
+log "Create database under instance $INST_NAME"
+log ================================================
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+command="id -u $INST_NAME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+if [ $? -ne 0 ] ; then
+   log "Instance user $INST_NAME does not exist."
+   exit 1
+fi  
+
+cat << EOF > /tmp/createdatabase
+  su - $INST_NAME
+  echo ================================================
+  echo Create database $DB_NAME in instance $INST_NAME
+  echo ================================================
+  db2 "create database $DB_NAME on $TLD dbpath on $TLD pagesize 32 K with 'Db2 WH System' autoconfigure apply db only"
+  if [ $? -ne 0 ] ; then
+     echo "Error: Database creation issue:"
+     echo exit 1 -- check if this is OK or not
+  fi   
+  db2 update db cfg for $DB_NAME using EXTBL_LOCATION / immediate
+  echo ================================================
+  echo "Create storage group for temporary tablespaces"
+  echo ================================================
+  db2 connect to $DB_NAME
+  db2 "create stogroup db2stogrptemp on '$TLD/DB2LOCAL'"
+  echo ================================================
+  echo "Create buffer pool and system temporary tablespace"
+  echo ================================================
+  db2 "create system temporary tablespace db2stemp pagesize 32 K managed by automatic storage using stogroup db2stogrptemp bufferpool ibmdefaultbp file system caching"
+  db2 "create user temporary tablespace db2utemp pagesize 32 K managed by automatic storage using stogroup db2stogrptemp bufferpool ibmdefaultbp file system caching"
+  db2 "create bufferpool bp8 pagesize 8K"
+  db2 "create system temporary tablespace db2stemp8 pagesize 8 K managed by automatic storage using stogroup db2stogrptemp bufferpool bp8 file system caching"
+  db2 "create user temporary tablespace db2utemp8 pagesize 8 K managed by automatic storage using stogroup db2stogrptemp bufferpool bp8 file system caching"
+  echo ================================================
+  echo "Drop default system temporary table space as we do not want replication on the temp tablespace"
+  echo ================================================
+  db2 "drop tablespace tempspace1"
+  echo ================================================
+  echo "Create database partition group for only one MLN"
+  echo ================================================
+  db2 "create database partition group dbpartgroup01 on dbpartitionnum (0)"
+  echo ================================================
+  echo "Create tablespace using dbpartgroup01 to force a few tables only on a single database partition"
+  echo ================================================
+  db2 "create tablespace ts01 in dbpartgroup01 pagesize 8k bufferpool bp8"
+  echo ================================================
+  exit
+  exit
+EOF
+
+log "Command used for starting db2 instance"
+log ======================================================================== 
+cat /tmp/createdatabase
+
+for host in {{$firstHost}}
+do
+    log Create database on $host under instance $INST_NAME 
+    log ======================================================================== 
+    $SSH -tt $host "/bin/bash -s" -- </tmp/createdatabase
+    if [ $? -ne 0 ] ; then 
+       log "Error: Check logs"
+       RC=1
+    fi   
+    log ======================================================================== 
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

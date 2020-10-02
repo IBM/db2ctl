@@ -1,0 +1,453 @@
+shutdown -h now
+yum -u update
+yum -y update
+lsblk
+reboot
+exit
+exit
+exit
+yum -y install epel-release
+yum -y install sshpass
+cat /etc/hosts
+ssh db2-pc-test-1-02
+vi /bin/runall
+chmod 755 /bin/runall
+runall uptime
+runall lsblk
+clear
+systemctl status firewalld
+clear
+wget --no-check-certificate https://my.linbit.com/linbit-manage-node.py
+chmod u+x linbit-manage-node.py
+./linbit-manage-node.py
+dnf install python3
+./linbit-manage-node.py
+yum install drbd-utils linstor-satellite linstor-client -y
+uname -r
+yum  list kmod-drbd
+yum install kmod-drbd-9.0.24_4.18.0_193-1 -y
+clear
+yum install linstor-controller -y
+systemctl enable linstor-controller
+systemctl start linstor-controlle
+systemctl start linstor-controller
+systemctl status linstor-controller -l
+systemctl enable linstor-satellite
+systemctl start linstor-satellite
+systemctl status linstor-satellite
+systemctl stop firewalld
+uname -n
+ls /etc/linstor
+cd /etc/linstor
+ls
+vi linstor-client.conf
+cat linstor-client.conf 
+linstor node create db2-pc-test-1-01.fyre.ibm.com
+linstor n c db2-pc-test-1-02.fyre.ibm.com
+linstor n l
+linstor n c db2-pc-test-1-03.fyre.ibm.com
+linstor n c db2-pc-test-1-04.fyre.ibm.com
+linstor n l
+linstor physical-storage list
+cat /etc/linstor/linstor-client.conf
+clear
+uname -r
+linstor n l
+linstor sp l
+linstor physical-storage list
+pvdisplay
+linstor n l
+linstor delete node db2-pc-test-1-01.fyre.ibm.com
+linstor node create db2-pc-test-1-01.fyre.ibm.com
+linstor node delete db2-pc-test-1-01.fyre.ibm.com
+linstor node create db2-pc-test-1-01.fyre.ibm.com --node-type Combined
+linstor n l
+clear
+linstor n l
+: systemctl enable --now cockpit.socket
+linstor physical-storage list
+linstor physical-storage create-device-pool --pool-name vg_db2 --storage-pool NVMEs LVM db2-pc-test-1-01.fyre.ibm.com /dev/vdb /dev/vdc /dev/vdd /dev/vde
+linstor physical-storage create-device-pool --pool-name vg_db2 --storage-pool NVMEs LVM db2-pc-test-1-02.fyre.ibm.com /dev/vdb /dev/vdc /dev/vdd /dev/vde
+linstor physical-storage create-device-pool --pool-name vg_db2 --storage-pool NVMEs LVM db2-pc-test-1-03.fyre.ibm.com /dev/vdb /dev/vdc /dev/vdd /dev/vde
+linstor physical-storage create-device-pool --pool-name vg_db2 --storage-pool NVMEs LVM db2-pc-test-1-04.fyre.ibm.com /dev/vdb /dev/vdc /dev/vdd /dev/vde
+linstor sp l
+pvdisplay
+linstor resource-group create --storage-pool NVMes --place-count 2 red2_NVME
+linstor resource-group set-property red2_NVME PeerSlotsNewResource 3
+linstor volume-group create red2_NVME
+for N in {00..23}; do    linstor rd c --resource-group red2_NVME NODE00${N}; done
+for N in {00..23}; do    linstor rd c --resource-group red2_NVME DIAG00${N}; done
+linstor rd l
+for N in {00..23}; do    linstor volume-definition create --minor $MINOR NODE00${N} $SIZE;    MINOR=$((MINOR+1))
+for N in {00..23}; do    linstor volume-definition create --minor 1000 NODE00${N} 5GB;    MINOR=$((MINOR+1))
+SIZE=5GB
+MINOR=1000
+for N in {00..23}; do    linstor volume-definition create --minor $MINOR NODE00${N} $SIZE;    MINOR=$((MINOR+1)); done
+linstor vd l
+SIZE=1GB
+MINOR=2000
+for N in {00..23}; do    linstor volume-definition create --minor $MINOR DIAG00${N} $SIZE;    MINOR=$((MINOR+1)); done
+MINOR=2000
+linstor vd l
+linstor n l
+linstor resource create db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-02.fyre.ibm.com NODE0000 --storage-pool NVMEs
+linstor r l -p
+drbdadm status NODE0000
+linstor resource create db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-02.fyre.ibm.com NODE0001 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com NODE0002 --storage-pool NVMEs
+linstor resource create db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com NODE0003 --storage-pool NVMEs
+ll
+vi script.sh
+chmod 777 script.sh 
+vi script.sh 
+./script.sh 
+linstor r l -p
+vi script.sh 
+./script.sh 
+linstor r l -p
+cat script.sh 
+linstor resource create db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com DIAG0003 --storage-pool NVMEs
+linstor resource delete db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com DIAG0003 --storage-pool NVMEs
+linstor resource delete db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com DIAG0003
+linstor resource create db2-pc-test-1-01.fyre.ibm.com db2-pc-test-1-03.fyre.ibm.com DIAG0003 --storage-pool NVMEs
+linstor r l -p
+linstor resource-group create --storage-pool NVMEs --layer-list storage local_NVME
+linstor volume-group create local_NVME
+linstor rd c --resource-group local_NVME --layer-list storage DB2LOCAL
+linstor vd c DB2LOCAL 10GB
+linstor r c --storage-pool NVMEs --layer-list storage db2-pc-test-1-01.fyre.ibm.com DB2LOCAL
+linstor r c --storage-pool NVMEs --layer-list storage db2-pc-test-1-02.fyre.ibm.com DB2LOCAL
+linstor r c --storage-pool NVMEs --layer-list storage db2-pc-test-1-03.fyre.ibm.com DB2LOCAL
+linstor r c --storage-pool NVMEs --layer-list storage db2-pc-test-1-04.fyre.ibm.com DB2LOCAL
+linstor rd c --resource-group red2_NVME nfs
+linstor vd create --minor 3000 nfs 1GB
+linstor r c --storage-pool NVMEs --auto-place 4 nfs
+linstor v l -p
+linstor v l
+lsblk
+vi script.sh 
+./script.sh 
+cat script.sh 
+vi script.sh 
+./script.sh 
+cat script.sh 
+vi script.sh 
+./script.sh 
+crm_node -l
+df -h
+yum -y install nfs-utils
+systemctl mask --now rpc-statd.service rpcbind.service rpcbind.socket
+vi /etc/nfs.conf
+scp /etc/nfs.conf db2-pc-test-1-02.fyre.ibm.com:/etc
+scp /etc/nfs.conf db2-pc-test-1-03.fyre.ibm.com:/etc
+scp /etc/nfs.conf db2-pc-test-1-04.fyre.ibm.com:/etc
+scp /etc/nfs.conf db2-pc-test-1-04.fyre.ibm.com:/etccat /proc/sys/fs/nfs/nlm_grace_period
+cat /proc/sys/fs/nfs/nlm_grace_period
+cat /proc/fs/nfsd/nfsv4gracetime
+cat /proc/fs/nfsd/nfsv4leasetime
+runall systemctl disable autofs
+runall systemctl stop autofs
+runall systemctl disable multipathd
+runall systemctl stop multipathd
+runall yum -y install pacemaker
+clear
+yum -y install crmsh
+systemctl disable nfs-server
+systemctl stop nfs-server
+systemctl enable corosync
+systemctl enable pacemaker
+cat /etc/hosts
+ip a s
+cat <<EOF > /etc/corosync/corosync.conf
+totem {
+  version: 2
+  secauth: off
+  cluster_name: db2whcluster
+  transport: udpu
+}
+nodelist {
+  node {
+    ring0_addr: 9.30.188.90
+    nodeid: 1
+  }
+  node {
+    ring0_addr: 9.30.189.120
+    nodeid: 2
+  }
+  node {
+    ring0_addr: 9.30.0.132
+    nodeid: 3
+  }
+  node {
+    ring0_addr: 9.30.1.135
+    nodeid: 4
+  }
+}
+quorum {
+  provider: corosync_votequorum
+  two_node: 0
+}
+logging {
+  to_syslog: yes
+}
+EOF
+
+cat /etc/corosync/corosync.conf
+scp /etc/corosync/corosync.conf db2-pc-test-1-02.fyre.ibm.com:/etc/corosync
+scp /etc/corosync/corosync.conf db2-pc-test-1-03.fyre.ibm.com:/etc/corosync
+scp /etc/corosync/corosync.conf db2-pc-test-1-04.fyre.ibm.com:/etc/corosync
+corosync-keygen
+scp /etc/corosync/authkey db2-pc-test-1-02.fyre.ibm.com:/etc/corosync
+scp /etc/corosync/authkey db2-pc-test-1-03.fyre.ibm.com:/etc/corosync
+scp /etc/corosync/authkey db2-pc-test-1-04.fyre.ibm.com:/etc/corosync
+runall systemctl start corosync
+runall systemctl status -l corosync
+runall systemctl start pacemaker
+corosync-cfgtool -s
+corosync-cmapctl | grep members
+crm_mon -1 | grep "Current DC"
+crm_node -l
+corosync-quorumtool
+runall mkdir -p /mnt/nfs/nfsserver
+crm resource show
+crm configure primitive nfsserver ocf:heartbeat:nfsserver params nfs_shared_infodir=/mnt/nfs/nfsserver nfs_ip=192.168.142.100 op start interval=0s timeout=40s op stop interval=0s timeout=20s
+crm configure primitive virtip ocf:heartbeat:IPaddr2 params ip=192.168.142.100 cidr_netmask=24 nic=team0 op start interval=0s timeout=20s op stop interval=0s timeout=20s
+crm configure primitive exportfs ocf:heartbeat:exportfs params clientspec=192.168.142.0/24 directory=/mnt/nfs fsid=1 unlock_on_stop=1 options=rw,no_root_squash,sync,no_subtree_check op start interval=0s timeout=40s op stop interval=0s timeout=120s
+crm configure primitive nfsfs ocf:heartbeat:Filesystem params device=/dev/drbd3000 directory=/mnt/nfs fstype=xfs options=inode64,logbsize=256k,noatime,nodiratime op start interval="0" timeout="60s" op stop interval="0" timeout="60s"
+crm configure order o_exportfs_before_virtip inf: exportfs virtip
+crm configure order o_nfsserver-before-exportfs inf: nfsserver exportfs
+crm configure order o_nfsfs_before_nfsserver inf: nfsfs nfsserver
+crm configure colocation c_virtip_with_exportfs inf: virtip exportfs
+crm configure colocation c_exportfs-with-nfsserver inf: exportfs nfsserver
+crm configure colocation c_nfsserver_with_nfsfs inf: nfsserver nfsfs
+crm_resource -C
+> /etc/exports
+runall "mkdir -p /misc/nfsshare"
+crm configure primitive nfsclient ocf:heartbeat:Filesystem params device=192.168.142.100:/mnt/nfs directory=/misc/nfsshare fstype=nfs  options="soft,timeo=50"
+crm configure clone cl_nfsclient nfsclient
+crm configure order o_nfsserver_before_cl_nfsclient Optional: nfsserver cl_nfsclient
+linstor v l -p | grep -E "NODE0000|DIAG0000"
+cat script.sh 
+vi script.sh 
+./script.sh 
+linstor n l
+vi newscript.sh
+chmod 777 newscript.sh 
+vi newscript.sh 
+./newscript.sh 
+clear
+vi newscript.sh 
+./newscript.sh 
+crm --force configure location lo_NODE0000 NODE0000 rule -inf: \#uname ne db2-pc-test-1-01.fyre.ibm.com and \#uname ne db2-pc-test-1-02.fyre.ibm.com
+crm --force configure location lo_NODE0000_pref NODE0000 rule 100: \#uname eq db2-pc-test-1-01.fyre.ibm.com
+crm --force configure location lo_fs_NODE0005 p_fs_NODE0005 rule -inf: \#uname ne db2-pc-test-1-01.fyre.ibm.com and \#uname ne db2-pc-test-1-04.fyre.ibm.com
+vi newscript.sh 
+./newscript.sh 
+cat newscript.sh 
+for n in {00..23}; do crm -F configure order o_NODE00${n}_before_DIAG00${n} inf: NODE00${n} DIAG00${n}; done
+for n in {00..23}; do crm -F configure colocation c_DIAG00${n}_with_NODE00${n} inf: DIAG00${n} NODE00${n}; done
+crm_mon -1Afr
+alias dfh='runall "df -h | grep NODE | sort"'
+dfh
+alias dft='runall "df -h | grep DB2LOCAL"'
+dft
+alias dfn='runall "df -h | grep nfs | sort"'
+dfn
+alias dfd='runall "df -h | grep DIAG | sort"'
+dfd
+crm_resource -C
+dfd
+df -h
+crm_resource list
+crm resource statusnfs
+crm resource status nfs
+crm resource --help
+crm resource start nfsserver
+crm resource status
+crm_resource -C
+drbdadm status nfs
+runall "ls -l /mnt"
+runall "ls -l /mnt/nfs"
+runall "ls -l /mnt/nfs"/nfsserver
+df -h
+cat /etc/fstab
+crm resource start nfsserver
+crm resource start nfsclient
+crm resource status
+exit
+crm resource status
+crm_mon -1Afr
+dmesg -H
+crm resource status
+crm_mon -1 --group-by-node
+drbdadm status
+df -h
+dfd
+alias dfh='runall "df -h | grep NODE | sort"'
+alias dft='runall "df -h | grep DB2LOCAL"'
+alias dfn='runall "df -h | grep nfs | sort"'
+alias dfd='runall "df -h | grep DIAG | sort"'
+crm_resourece -C
+crm_resourse -C
+crm_resource -C
+crm configure show
+crm_mon -1 | grep nfs
+crm_mon -1 | grep nfsfs
+crm_mon -1
+crm resource list
+crm resource start nfsserver
+crm resource list
+crm resource start virtip
+crm resource list
+crm resource start exportfs
+crm resource list
+for h in {00..23}; do  crm configure resource delete DIAG00${h}; done
+crm resource list
+crm configure property stonith-enabled=false
+history | grep stonith
+crm resource list
+crm_mon -1 | grep stopped
+crm_mon -1
+crm_resource -C
+for h in {00..23}; do  crm -F resource stop DIAG00${h}; done
+crm resource list
+for h in {00..23}; do  crm -F resource stop NODE00${h}; done
+crm resource list
+for h in {00..23}; do  crm -F configure resource delete NODE00${h}; done
+for h in {00..23}; do  crm -F configure delete NODE00${h}; done
+for h in {00..23}; do  crm -F configure delete DIAG00${h}; done
+crm resource list
+crm configure delete nfsserver
+crm resource list
+crm -F configure delete virtip
+crm -F configure delete exportfs
+crm -F configure delete nfsfs
+crm resource list
+crm resource delete delete
+crm configure delete delete
+crm resource list
+crm configure delete cl_nfsclient
+crm resource list
+crm configure delete nfsclient
+crm resource list
+runall mkdir -p /mnt/nfs/nfsserver
+crm configure primitive nfsserver ocf:heartbeat:nfsserver params nfs_shared_infodir=/mnt/nfs/nfsserver nfs_ip=192.168.142.100 op start interval=0s timeout=40s op stop interval=0s timeout=20s
+crm configure delete nfsserver
+crm resource stop nfsserver
+crm configure delete nfsserver
+crm resource list
+crm configure delete nfsserver
+crm resource list
+ip a s
+runall ip a s eth0
+.242
+ping 10.11.1.134
+ping -c4 10.11.1.134
+ping -c4 10.11.1.135
+ping -c4 10.11.1.242
+ping -c4 10.11.2.20
+ip a s eth0
+ping -c4 10.11.1.2
+crm configure primitive nfsserver ocf:heartbeat:nfsserver params nfs_shared_infodir=/mnt/nfs/nfsserver nfs_ip=10.11.1.2 op start interval=0s timeout=40s op stop interval=0s timeout=20s
+crm resource list
+crm configure primitive virtip ocf:heartbeat:IPaddr2 params ip=10.11.1.2 cidr_netmask=20 nic=eth0 op start interval=0s timeout=20s op stop interval=0s timeout=20s
+ip a s
+ping -c4 10.11.1.2
+crm configure primitive exportfs ocf:heartbeat:exportfs params clientspec=10.11.1.2.0/20 directory=/mnt/nfs fsid=1 unlock_on_stop=1 options=rw,no_root_squash,sync,no_subtree_check op start interval=0s timeout=40s op stop interval=0s timeout=120s
+crm configure delete exportfs
+crm configure primitive exportfs ocf:heartbeat:exportfs params clientspec=10.11.1.0/20 directory=/mnt/nfs fsid=1 unlock_on_stop=1 options=rw,no_root_squash,sync,no_subtree_check op start interval=0s timeout=40s op stop interval=0s timeout=120s
+crm configure primitive nfsfs ocf:heartbeat:Filesystem params device=/dev/drbd3000 directory=/mnt/nfs fstype=xfs options=inode64,logbsize=256k,noatime,nodiratime op start interval="0" timeout="60s" op stop interval="0" timeout="60s"
+crm configure order o_exportfs_before_virtip inf: exportfs virtip
+crm configure order o_nfsserver-before-exportfs inf: nfsserver exportfs
+crm configure order o_nfsfs_before_nfsserver inf: nfsfs nfsserver
+crm configure colocation c_virtip_with_exportfs inf: virtip exportfs
+crm configure colocation c_exportfs-with-nfsserver inf: exportfs nfsserver
+crm configure colocation c_nfsserver_with_nfsfs inf: nfsserver nfsfs
+crm_resource -C
+> /etc/exports
+crm_resource -C
+crm resource list
+crm configure delete exportfs
+crm configure delete nfsfs
+crm resource list
+crm configure show
+crm configure primitive exportfs ocf:heartbeat:exportfs params clientspec=10.11.0.0/16 directory=/mnt/nfs fsid=1 unlock_on_stop=1 options=rw,no_root_squash,sync,no_subtree_check op start interval=0s timeout=40s op stop interval=0s timeout=120s
+crm resource list
+crm configure primitive nfsfs ocf:heartbeat:Filesystem params device=/dev/drbd3000 directory=/mnt/nfs fstype=xfs options=inode64,logbsize=256k,noatime,nodiratime op start interval="0" timeout="60s" op stop interval="0" timeout="60s"
+history
+crm configure delete nfsfs
+crm configure primitive nfsfs ocf:heartbeat:Filesystem params device=/dev/drbd1000 directory=/mnt/nfs fstype=xfs options=inode64,logbsize=256k,noatime,nodiratime op start interval="0" timeout="60s" op stop interval="0" timeout="60s"
+crm configure order o_exportfs_before_virtip inf: exportfs virtip
+crm configure order o_nfsserver-before-exportfs inf: nfsserver exportfs
+crm configure order o_nfsfs_before_nfsserver inf: nfsfs nfsserver
+crm configure colocation c_virtip_with_exportfs inf: virtip exportfs
+crm configure colocation c_exportfs-with-nfsserver inf: exportfs nfsserver
+crm configure colocation c_nfsserver_with_nfsfs inf: nfsserver nfsfs
+crm_resource -C
+crm resource list
+> /etc/exports
+runall "mkdir -p /misc/nfsshare"
+crm configure primitive nfsclient ocf:heartbeat:Filesystem params device=10.11.1.2:/mnt/nfs directory=/misc/nfsshare fstype=nfs  options="soft,timeo=50"
+crm configure clone cl_nfsclient nfsclient
+crm configure order o_nfsserver_before_cl_nfsclient Optional: nfsserver cl_nfsclient
+ll
+vi script.sh 
+vi newscript.sh 
+vi script.sh 
+./script.sh 
+./newscript.sh 
+for n in {00..23}; do crm -F configure order o_NODE00${n}_before_DIAG00${n} inf: NODE00${n} DIAG00${n}; done
+for n in {00..23}; do crm -F configure colocation c_DIAG00${n}_with_NODE00${n} inf: DIAG00${n} NODE00${n}; done
+crm_resource -C
+dfd
+dfh
+crm_resource -C
+dfh
+crm -n -D plain configure show
+dfh
+dfd
+dft
+dfd
+dfn
+dfd
+touch cleanup.sh
+history
+vi cleanup.sh 
+chmod 777 cleanup.sh 
+./cleanup.sh 
+cat cleanup.sh 
+vi clean
+vi cleanup.sh 
+vi script.sh 
+lsblk
+ crm configure primitive NODE0000 ocf:heartbeat:Filesystem params device=/dev/drbd1000 directory=/db2db/db2wh/NODE0000 fstype=xfs options=inode64,logbsize=256k,noatime,nodiratime op start interval="0" timeout="60s" op stop interval="0" timeout="60s"
+vi script.sh 
+crm configure primitive NODE0001 ocf:heartbeat:Filesystem params device=/dev/drbd1002 directory=/db2db/db2wh/NODE0001 fstype=xfs options=inode64,logbsize=256k,noatime,nobarrier,nodiratime op start interval="0" timeout="60s" op stop interval="0" timeout="60s"
+./cleanup.sh 
+linstor v l -p
+drbdadm status NODE0000
+ll
+history
+linstor r l -p
+history
+ll
+mv newscript.sh colocation.sh
+vi colocation.sh 
+ll
+vi script.sh 
+mv script.sh configure_primitive.sh
+ll
+history
+vi cleanup.sh 
+cp cleanup.sh setup.sh
+ll
+vi setup.sh 
+ll
+mkdir scripts
+mv *.sh scripts/
+ll
+cd scripts/
+ll
+cat cleanup.sh 
+cat configure_primitive.sh 
+ll

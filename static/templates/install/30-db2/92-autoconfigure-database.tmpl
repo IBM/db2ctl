@@ -1,0 +1,66 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+INST_NAME={{.Spec.DB2.Required.InstanceName}}
+DB_NAME={{.Spec.DB2.Required.DatabaseName}}
+TLD={{.Spec.DB2.Optional.TopLevelDir}}
+{{- $role := .Spec.DB2.Required.Role}}
+{{- if eq $role "optimized"}}
+LOGFILSIZ=75000
+{{- else}}
+LOGFILSIZ=5000
+{{- end}}
+
+log ================================================
+log "Autoconfigure database $DB_NAME under instance $INST_NAME"
+log ================================================
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+command="id -u $INST_NAME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+if [ $? -ne 0 ] ; then
+   log "Instance user $INST_NAME does not exist."
+   exit 1
+fi  
+
+cat << EOF > /tmp/autoconfigure
+  su - $INST_NAME
+  db2 force applications all
+  sleep 3
+  db2stop force
+  db2start
+  db2 activate db $DB_NAME
+  db2 connect to $DB_NAME
+  db2 autoconfigure apply db only
+  db2 update db cfg for $DB_NAME using logfilsiz $LOGFILSIZ immediate
+  db2 terminate
+  db2 deactivate db $DB_NAME
+  db2 activate db $DB_NAME
+  db2 connect to $DB_NAME
+  exit
+  exit
+EOF
+
+log "Command used for autoconfigure database"
+log ======================================================================== 
+cat /tmp/autoconfigure
+
+for host in {{$firstHost}}
+do
+    log Autoconfugure database on $host 
+    log ======================================================================== 
+    $SSH -tt $host "/bin/bash -s" -- </tmp/autoconfigure
+    log ======================================================================== 
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

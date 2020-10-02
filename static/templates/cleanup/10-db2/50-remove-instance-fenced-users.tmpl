@@ -1,0 +1,43 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+INSTANCENAME={{.Spec.DB2.Required.InstanceName}}
+FENCEDNAME={{.Spec.DB2.Required.FencedName}}
+
+log ========================================================================
+log "Remove db2 instance and fenced users"
+log ======================================================================== 
+
+command="killall -u $INSTANCENAME ;  userdel -f -r  INSTANCENAME ; killall -u $FENCEDNAME ;  userdel -f -r  $FENCEDNAME ;"
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  command="killall -u $INSTANCENAME"
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+
+  command="userdel -f -r  $INSTANCENAME"
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+
+  command="killall -u $FENCEDNAME"
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+
+  command="userdel -f -r  $FENCEDNAME ;"
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+done
+
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

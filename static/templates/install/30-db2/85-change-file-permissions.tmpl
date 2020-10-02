@@ -1,0 +1,40 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+INST_NAME={{.Spec.DB2.Required.InstanceName}}
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+TLD={{.Spec.DB2.Optional.TopLevelDir}}
+
+log ================================================
+log Change file permissions to $INST_NAME
+
+command="id -u $INST_NAME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+if [ $? -ne 0 ] ; then
+   log "Instance user $INST_NAME does not exist."
+   exit 1
+fi  
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    command="[ -d /db2db/DB2LOCAL ] && mkdir -p $TLD/DB2LOCAL"
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    log ======================================================================== 
+
+    command="chown -R $INST_NAME.$INST_NAME $TLD/"
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    log ======================================================================== 
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

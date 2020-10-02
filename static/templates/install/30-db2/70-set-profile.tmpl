@@ -1,0 +1,49 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+INST_NAME={{.Spec.DB2.Required.InstanceName}}
+
+log ================================================
+log "Set db2set params for $INST_NAME"
+log ================================================
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+command="id -u $INST_NAME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+if [ $? -ne 0 ] ; then
+   log "Instance user $INST_NAME does not exist."
+   exit 1
+fi
+
+cat << EOF > /tmp/setprofile
+if [ -f /home/$INST_NAME/sqllib/db2profile ] ; then
+. /home/$INST_NAME/sqllib/db2profile
+fi
+EOF
+
+log "Command used for setting profile"
+log ======================================================================== 
+cat /tmp/setprofile
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    log Copy profile to $host 
+    log ======================================================================== 
+    $SCP /tmp/setprofile $host:/home/$INST_NAME/.profile
+    command="chown $INST_NAME.$INST_NAME /home/$INST_NAME/.profile"
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    log ======================================================================== 
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

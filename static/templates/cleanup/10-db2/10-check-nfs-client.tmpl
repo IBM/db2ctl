@@ -1,0 +1,38 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+log ========================================================================
+log "Check NFS client on all nodes"
+log ========================================================================
+
+command="crm resource status nfsclient 2>&1"
+for host in {{$firstHost}}
+do
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ========================================================================
+done
+
+command="grep -qs '/misc/nfsshare ' /proc/mounts"
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  if [ $? -eq 0 ] ; then
+    log "nfs client is running on host $host"
+  else
+    log "nfs client is NOT running on host $host"
+  fi
+  log ========================================================================
+done  
+
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

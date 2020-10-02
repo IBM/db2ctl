@@ -1,0 +1,133 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+start=$SECONDS
+
+log ========================================================================
+log CLEANUP PACEMAKER
+log ========================================================================
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+id -u {{.Spec.DB2.Required.InstanceName}}
+if [ $? -eq 0 ] ; then
+  command="pgrep -u {{.Spec.DB2.Required.InstanceName}} -x db2sysc >/dev/null"
+  for host in {{.Spec.Nodes.Required.NamesAsList}}
+  do
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    if [ $? -eq 0 ] ; then
+      log "Error: db2sysc process is running. It is not advisable to remove Pacemaker."
+      log "Info: Stop db2 instance {{.Spec.DB2.Required.InstanceName}} - if you want to cleanup Pacemaker."
+      exit 1
+    fi
+    log ======================================================================== 
+  done
+fi
+
+log "Check if Pacemaker is even installed"
+log ========================================================================
+command="which crm"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+if [ $? -ne 0 ] ; then
+   log "Is pacemaker even installed? I did not find crm."
+   exit 1
+fi   
+
+log Check if Pacemaker nodes are defined.
+log ========================================================================
+command="crm node list"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+if [ $? -eq 1 ] ; then
+   log No Pacemaker nodes found. Exiting ....
+   exit 0
+fi
+
+log "cleanup all errors"
+log ======================================================================== 
+command="crm_resource -C"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+log "Stop all resources"
+log ======================================================================== 
+command="crm -F configure property stop-all-resources=true"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+log "Force umount /misc/nfsshare"
+log ======================================================================== 
+command="umount -f /misc/nfsshare"
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+done
+
+log "Wait for all resources to stop"
+log ======================================================================== 
+
+i=0
+cnt=50
+while [ $i -lt $cnt ]
+do
+   log "Iteration $i/$cnt to wait for all resources to stop"
+   if $SSH {{$firstHost}} crm_mon -1 | grep -q "No active resource[s]" ; then
+     break
+   else
+     $SSH {{$firstHost}} "crm_resource -C"
+     sleep 5
+   fi
+   i=$[$i+1]
+   log ======================================================================== 
+done
+
+log "Erase all resources"
+log ======================================================================== 
+command="cibadmin --erase --force"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+log "Stop Pacemaker and CorosSync on all nodes"
+log ======================================================================== 
+command="systemctl stop pacemaker corosync ; rm -f /etc/corosync/corosync.conf"
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+done
+
+VIP={{.Spec.NFS.Server.Required.VirtualIP}}
+CIDR={{.Spec.NFS.Server.Required.CIDRNetMask}}
+NIC={{.Spec.NFS.Server.Required.NIC}}
+
+log "Cleanup leftover VIP if any"
+log ======================================================================== 
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    command="ping -c4 $VIP"
+    log Run command on $host -- $command
+    $SSH $host "$command" > /dev/null 2>&1
+    if [ $? -eq 0 ] ; then
+      echo "$host $VIP ping SUCCESS"
+      log "Delete $VIP on $host"
+      command="ip address delete $VIP/$CIDR dev $NIC"
+      log Run command on $host -- $command
+      $SSH $host "$command"
+    fi
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

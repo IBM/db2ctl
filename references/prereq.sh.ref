@@ -1,0 +1,8 @@
+runall "sed  -i 's/.*/&.fbond/g' /etc/hostname"
+runall "hostnamectl set-hostname \$(cat /etc/hostname)"
+# This will be for RHEL 8.2
+runall "sed -i 's/# grace-time=90/grace-time=10/g' /etc/nfs.conf"
+runall "sed -i 's/# lease-time=90/lease-time=10/g' /etc/nfs.conf"
+# This will be for RHEL 7.8
+runall sed -i 's/#NFSD_V4_GRACE=90/NFSD_V4_GRACE=10/g' /etc/sysconfig/nfs
+runall sed -i 's/#NFSD_V4_LEASE=90/NFSD_V4_LEASE=10/g' /etc/sysconfig/nfs

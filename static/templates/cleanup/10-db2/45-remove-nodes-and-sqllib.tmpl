@@ -1,0 +1,64 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+INSTANCENAME={{.Spec.DB2.Required.InstanceName}}
+DATABASENAME={{.Spec.DB2.Required.DatabaseName}}
+DB2VERSION={{.Spec.DB2.Required.DB2Version}}
+
+log ========================================================================
+log "Remove db2 instance $INSTANCENAME directory soft link, if left over by any chance"
+log ======================================================================== 
+
+command="/bin/rm -f /home/$INSTANCENAME/sqllib"
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+done
+
+log "Remove NODEs data"
+log ======================================================================== 
+TLD={{.Spec.DB2.Optional.TopLevelDir}}
+{{- $replicated := .Spec.DB2.Required.Replicated}}
+
+{{- range $val1 := .DataToNode}}
+{{- if $replicated}}
+command="rm -fr $TLD/$INSTANCENAME/{{$val1.DBPrimitiveName}}/*"
+{{- else}}
+command="rm -fr $TLD/DB2LOCAL/$INSTANCENAME/{{$val1.DBPrimitiveName}}/*"
+{{- end}}
+log "Run command on {{$val1.PrimaryServer}} -- $command"
+$SSH {{$val1.PrimaryServer}} "$command"
+log ========================================================================
+{{- end}}
+
+log "Remove sqllib directory from NFS"
+log ======================================================================== 
+command="rm -fr /misc/nfsshare/sqllib-$INSTANCENAME"
+for host in {{$firstHost}}
+do
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+done
+
+log "Remove altdiag"
+log ======================================================================== 
+command="rm -fr /altdiag/$INSTANCENAME/*"
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+done
+
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

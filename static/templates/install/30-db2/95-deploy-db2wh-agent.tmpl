@@ -1,0 +1,34 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+log ================================================
+log "Install Pacemaker db2wh agent"
+log ================================================
+cat /tmp/db2wh
+log ================================================
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    log "Copy /tmp/db2wh on $host in /usr/lib/ocf/resource.d/heartbeat"
+    log ======================================================================== 
+    
+    command="$SCP -p /tmp/db2wh $host:/usr/lib/ocf/resource.d/heartbeat"
+    log Run command on $host -- $command
+    eval $command
+
+    log "Set execution mode of /usr/lib/ocf/resource.d/heartbeat/db2wh on $host"
+    command="chmod 755 /usr/lib/ocf/resource.d/heartbeat/db2wh"
+    log Run command on $host -- $command
+    $SSH $host $command
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

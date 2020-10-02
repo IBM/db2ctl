@@ -1,0 +1,57 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+INST_NAME={{.Spec.DB2.Required.InstanceName}}
+
+log ================================================
+log "Set db2set params for $INST_NAME"
+log ================================================
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+command="id -u $INST_NAME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+if [ $? -ne 0 ] ; then
+   log "Instance user $INST_NAME does not exist."
+   exit 1
+fi  
+
+{{- $organization := .Spec.DB2.Required.Organization}}
+
+cat << EOF > /tmp/db2setparams
+#!/bin/bash
+su - $INST_NAME
+cat << EOT > /home/$INST_NAME/sqllib/bpvars.cfg
+MAX_PAGES_PER_DIRTY_LIST=50000,1
+EOT
+db2set DB2RSHCMD="/usr/bin/ssh"
+{{- if eq $organization "column"}}
+db2set DB2_WORKLOAD=ANALYTICS
+db2set DB2_EXTENDED_OPTIMIZATION="COL_PAR_IUD_DEGREE_FACTOR 1.5,FORCE_REPLICATED_MQT_MERGE"
+{{- else}}
+db2set DB2_WORKLOAD=
+{{- end}}
+db2set DB2COMM=TCPIP
+db2set DB2AUTH=OSAUTHDB
+exit
+exit
+EOF
+
+log "Command used for setting db2set params"
+log ======================================================================== 
+cat /tmp/db2setparams
+
+log Generate public/private keys on {{$firstHost}}
+log ======================================================================== 
+$SSH -tt {{$firstHost}} "/bin/bash -s" -- </tmp/db2setparams
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

@@ -1,0 +1,34 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+DB2BINARY={{.Spec.DB2.Required.DB2Binary}}
+DB2VERSION={{.Spec.DB2.Required.DB2Version}}
+
+cat << EOT > /tmp/untar-db2ctl-download
+if grep -qs '/misc/nfsshare ' /proc/mounts; then
+    cd /misc/nfsshare/db2ctl-download || exit 1
+    tar xvfz $DB2BINARY
+    exit 0
+else
+    echo "/misc/nfsshare is not mounted on {{$firstHost}}"
+    exit 1
+fi
+EOT
+
+log ================================================
+log Untar db2 binaries in {{$firstHost}}
+log ================================================
+$SSH -tt {{$firstHost}} "/bin/bash -s" -- </tmp/untar-db2ctl-download
+RC=$?
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

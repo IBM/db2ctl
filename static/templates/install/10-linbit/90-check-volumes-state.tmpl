@@ -1,0 +1,70 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+# One of the disk disk must be in UpToDate state. 
+# The seond disk can be inconsistent as it might be still in the 
+# process of sync target and it is not an error.
+# The third disk is the quorum and acts like a quorum fisk.
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+log ========================================================================
+log DRBD Volumes Sanity Check
+log ========================================================================
+
+## Check NODE
+
+
+{{- $replicated := .Spec.DB2.Required.Replicated}}
+{{- range $val1 := .DataToNode}}
+{{- if $replicated}}
+
+#log Run command -- $command
+command="curl -s -X GET http://{{$firstHost}}:3370/v1/view/resources?resources={{$val1.DBPrimitiveName}}"
+#log Run command on {{$firstHost}} -- $command
+RESULTS=($($SSH {{$firstHost}} "$command | jq -r '.[].volumes[].state.disk_state'"))
+LRC=1
+for ((i=0; i<${#RESULTS[@]}; i++))
+do 
+   result=${RESULTS[i]}
+   if [ "$result" = "UpToDate" ] ; then 
+      LRC=0
+      break
+   fi
+done
+test $LRC -eq 0 && log "Status of volume -- {{$val1.DBPrimitiveName}}=OK" || echo "Status of disk {{$val1.DBPrimitiveName}}=$result"
+if [ $LRC -eq 1 ] ; then
+   RC=1
+fi   
+log ========================================================================
+{{- end}}
+{{- end}}
+
+# Check nfs
+
+command="curl -s -X GET http://{{$firstHost}}:3370/v1/view/resources?resources=nfs"
+log Run command on {{$firstHost}} -- $command
+RESULTS=($($SSH {{$firstHost}} "$command | jq -r '.[].volumes[].state.disk_state'"))
+LRC=1
+for result in $RESULTS
+do 
+   if [ "$result" = "UpToDate" ] ; then 
+      LRC=0
+      break
+   fi
+done
+test $LRC -eq 0 && log "Status of volume -- nfs=OK" || echo "Status of volume -- nfs=Inconsistent"
+if [ $LRC -eq 1 ] ; then
+   RC=1
+fi
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

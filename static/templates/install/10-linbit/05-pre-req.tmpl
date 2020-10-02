@@ -1,0 +1,183 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+log ========================================================================
+log Check the difference between installed and loaded kernel
+log ========================================================================
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  LOADED_KERNEL=$($SSH $host "cat /proc/version" | awk '{print $3}')
+  LATEST_INSTALLED_KERNEL=$($SSH $host "rpm -q --last kernel" | head -1 | awk '{print $1}' | sed 's/^kernel-//g') 
+  if [ "x$LOADED_KERNEL" != "x$LATEST_INSTALLED_KERNEL" ] ; then
+    log "Error: Mismatch between installed and running kernel on $host"
+    log "Info:  You may need to reboot to apply the latest kernel on $host"
+    RC=1
+    log ========================================================================
+  fi
+done
+
+[ $RC -eq 1 ] && exit 1
+
+log Create useful aliases and utilities and copy on all hosts
+log ========================================================================
+
+cat << 'EOF' > /tmp/alias.sh
+export PATH=.:$PATH
+shopt -s direxpand
+alias root='sudo su -'
+alias sedc="sed -e '/^$/d' -e '/^#.*$/d'"
+alias ..='cd ..'
+alias ...='cd ../..'
+alias cd..='cd ..'
+alias ls-l='ls -l'
+alias ltr='ls -ltr'
+alias ls='ls -l --color=none'
+alias l='ls -ltr'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias grep='grep --color=auto'
+alias md='mkdir -p'
+alias d="dig +search +answer +noall $1"
+alias dfh='runall "df -h | grep NODE | sort"'
+alias dft='runall "df -h | grep DB2LOCAL"'
+alias dfn='runall "df -h | grep nfs | sort"'
+alias psdb2='runall "ps -ef | grep db2sys[c]"'
+alias crmall='crm -1Afr --group-by-node'
+EOF
+
+cat << 'EOF' > /tmp/runall
+#!/bin/bash
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   echo Running "$@" on $host
+   /usr/bin/ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes $host "$@"
+done
+EOF
+
+cat << 'EOF' > /tmp/runscp
+#!/bin/bash
+
+if [[ $# < 1 ]] ; then
+   echo "Usage $0 fileName" 1>&2
+   exit
+fi
+
+# Copy a full path file name from the current host to all other hosts
+
+filetocopy=$(readlink -f $1)
+diroffiletocopy=$(dirname "${filetocopy}")
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   if [[ "$host" = "$(hostname)" ]] ; then
+      continue
+   fi
+   /usr/bin/ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes $host "mkdir -p $diroffiletocopy" 2>&1 > /dev/null
+   echo Copying $filetocopy to $host
+   /usr/bin/scp -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes $filetocopy $host:$filetocopy
+done
+EOF
+
+
+IPARRAY=({{.Spec.Nodes.Required.IPAddressesAsList}})
+HOSTARRAY=({{.Spec.Nodes.Required.NamesAsList}})
+> /tmp/known_hosts2
+for (( i=0; i<${#HOSTARRAY[@]}; i++ ));
+do
+    shortName=$(echo ${HOSTARRAY[i]} | cut -d"." -f1)
+    command="ssh-keyscan -t ecdsa $shortName,${HOSTARRAY[i]},${IPARRAY[i]}"
+    log Run command -- $command
+    $command >> /tmp/known_hosts2 2>/dev/null
+done
+# Merge 
+$SCP -p {{$firstHost}}:/root/.ssh/known_hosts ~/
+paste /tmp/known_hosts2 ~/known_hosts > /tmp/known_hosts
+
+chmod +x /tmp/runall
+chmod +x /tmp/runscp
+/bin/cp -f /tmp/runall /bin
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  log ========================================================================
+  log Copy aliases and other goodies to host $host
+  $SCP -p /tmp/alias.sh $host:/etc/profile.d/
+  $SCP -p /tmp/runall $host:/bin
+  $SCP -p /tmp/runscp $host:/bin
+  $SCP -p /tmp/known_hosts $host:/root/.ssh
+done
+
+## Add cleanup of existing yum run, if any
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   command="test -f /var/run/yum.pid && kill -9 \$(cat /var/run/yum.pid) || echo 'yum not running'"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+done
+
+# run only on first node
+
+log ========================================================================
+log Install linstor-controller on first node {{$firstHost}}
+log ========================================================================
+
+command="yum -y install linstor-controller"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+log ========================================================================
+
+# run on all nodes
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do   
+   command="yum -y install linstor-satellite linstor-client"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   log ========================================================================
+   
+   command="yum -y install jq kmod-drbd drbd-utils drbd-pacemaker" 
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   log ========================================================================
+done
+
+## Sanity checks if the previous steps were successful or not
+
+command="rpm -q linstor-controller"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+if [[ $? -ne 0 ]] ; then
+   log Error: $command did not succeed on the {{$firstHost}}
+   exit 1
+fi   
+log ========================================================================
+
+RC=0
+echo  Checking necessary software on all hosts
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   for pkg in "kmod-drbd drbd-utils linstor-satellite linstor-client"
+   do
+      command="rpm -q $pkg"
+      log Run command on $host -- $command
+      $SSH $host "$command"
+      if [[ $? -ne 0 ]] ; then
+         log Error: $command did not succeed on the $host
+         RC=1
+      fi   
+   done
+   log ========================================================================
+done
+
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

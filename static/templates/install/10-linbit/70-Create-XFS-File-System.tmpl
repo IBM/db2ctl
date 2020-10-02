@@ -1,0 +1,163 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+{{- $replicated := .Spec.DB2.Required.Replicated}}
+
+log ========================================================================
+log Create xfs file system on NFS Volume
+log ========================================================================
+
+command="curl -s -X GET http://{{$firstHost}}:3370/v1/view/resources?resources=nfs"
+
+log Run command on {{$firstHost}} -- $command
+HOSTS=($($SSH {{$firstHost}} "$command | jq -r '.[].node_name'"))
+STATUS=($($SSH {{$firstHost}} "$command | jq -r '.[].volumes[].state.disk_state'"))
+
+LRC=1
+for ((i=0; i<${#HOSTS[@]}; i++))
+do 
+   if [ "${STATUS[i]}" = "UpToDate" ] ; then 
+      LRC=0
+      command="mkfs.xfs -K -d su=4096k,sw={{.Spec.Linbit.Optional.NumStripes}} -f /dev/drbd{{.Spec.Linbit.Optional.VolumeDefinition.NFS.Minor}}"
+      log Run command on ${HOSTS[i]} -- $command
+      $SSH ${HOSTS[i]} "$command"
+      break
+   fi
+done
+if [ $LRC -eq 1 ] ; then
+   log "Error: The NFS volume were not in UpToDate/Unused state to create the file system on NFS."
+   log "Do the LinBit cleanup and try again."
+   exit 1
+fi   
+
+{{- if $replicated}}
+log ========================================================================
+log Create xfs file system on NODE
+log ========================================================================
+
+SPNAME=NVMEs
+HOSTS=({{.Spec.Nodes.Required.NamesAsList}})
+NUM_HOSTS=${#HOSTS[@]}
+TOTAL_MLN={{.Spec.Nodes.Required.Partitions}}
+PER_HOST_MLN=$((TOTAL_MLN/NUM_HOSTS))
+NLEVEL={{.Spec.DB2.Optional.TopLevelDir}}/{{.Spec.DB2.Required.InstanceName}}
+FTYPE=NODE00
+
+S=0
+E=$((S+PER_HOST_MLN-1))
+for host in ${HOSTS[@]}
+do
+   for n in $(seq $S $E)
+   do
+      nn=$((n+{{.Spec.Linbit.Optional.VolumeDefinition.Nodes.Minor}}))
+      DIR_NODE=$(printf "NODE%04d" $n)
+      DEV_NODE=$(printf "/dev/drbd%04d" $nn)
+
+      command="mkfs.xfs -K -d su=4096k,sw={{.Spec.Linbit.Optional.NumStripes}} -f $DEV_NODE"
+      log Run command on $host -- $command
+      $SSH $host "$command"
+      log ========================================================================
+   done
+   S=$((E+1))
+   E=$((S+PER_HOST_MLN-1))
+done
+{{- end}}
+
+log Create xfs file system on DB2LOCAL
+log ========================================================================
+
+for host in ${HOSTS[@]}
+do
+   $SSH $host linstor v l -p | grep $host | grep DB2LOCAL | awk -F "|" '{print $7}' > /tmp/${host}.locallist
+   block=$(cat /tmp/${host}.locallist)
+
+   command="mkdir -p {{.Spec.DB2.Optional.TopLevelDir}}/DB2LOCAL"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+
+   command="mkfs.xfs -K -d su=4096k,sw={{.Spec.Linbit.Optional.NumStripes}} -f $block"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+
+   command="blkid -s UUID -o value $block"
+   log Run command on $host -- $command
+   $SSH $host "$command" > /tmp/${host}.DB2LOCAL.uuid
+   log ========================================================================
+done
+
+log Create systmed.mount for DB2LOCAL
+log ========================================================================
+
+for host in ${HOSTS[@]}
+do
+   TLD={{.Spec.DB2.Optional.TopLevelDir}}
+{{- if $replicated}}   
+cat << EOF > /tmp${TLD}-DB2LOCAL.mount
+{{- else}}
+cat << EOF > /tmp${TLD}.mount
+{{- end}}
+[Unit]
+Description=DB2 LOCAL Mount
+
+[Mount]
+What=/dev/disk/by-uuid/$(cat /tmp/${host}.DB2LOCAL.uuid)
+{{- if $replicated}}
+Where=${TLD}/DB2LOCAL
+{{- else}}
+Where=${TLD}
+{{- end}}
+Type=xfs
+Options=defaults
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    {{- if $replicated}}
+    command="$SCP /tmp${TLD}-DB2LOCAL.mount $host:/etc/systemd/system"
+    {{- else}}
+    command="$SCP /tmp${TLD}.mount $host:/etc/systemd/system"
+    {{- end}}
+    log Run command on $host -- $command
+    $command
+    test $? -ne 0 && echo RC=1 || echo RC=0
+
+    {{- if $replicated}}
+    command="systemctl enable ${TLD#/}-DB2LOCAL.mount"
+    {{- else}}
+    command="systemctl enable ${TLD#/}.mount"
+    {{- end}}
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    test $? -ne 0 && echo RC=1 || echo RC=0
+    log ========================================================================
+
+    {{- if $replicated}}
+    command="systemctl start ${TLD#/}-DB2LOCAL.mount"
+    {{- else}}
+    command="systemctl start ${TLD#/}.mount"
+    {{- end}}
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    test $? -ne 0 && echo RC=1 || echo RC=0
+    
+    {{- if $replicated}}
+    command="df -h ${TLD}/DB2LOCAL"
+    {{- else}}
+    command="df -h ${TLD}"
+    {{- end}}
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    test $? -ne 0 && echo RC=1 || echo RC=0
+    log ========================================================================    
+done
+
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

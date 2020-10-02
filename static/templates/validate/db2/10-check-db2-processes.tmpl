@@ -1,0 +1,26 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+start=$SECONDS
+
+log ========================================================================
+log Check Db2 Processes
+log ========================================================================
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+command="pgrep -u {{.Spec.DB2.Required.InstanceName}} -x db2sysc"
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

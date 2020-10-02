@@ -1,0 +1,38 @@
+# This is an example goreleaser.yaml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+# before:
+#   hooks:
+#     # You may remove this if you don't use go modules.
+#     - go mod download
+# builds:
+#   - env:
+#       - CGO_ENABLED=0
+#     goos:
+#       - linux
+# checksum:
+#   name_template: 'checksums.txt'
+changelog:
+  sort: desc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+# github_urls:
+#   api: https://github.ibm.com/api/v3/
+#   upload: https://github.ibm.com/api/uploads/
+#   download: https://github.ibm.com/
+  # set to true if you use a self-signed certificate
+ # skip_tls_verify: false
+build:
+  skip: true
+checksum:
+  # Disable the generation/upload of the checksum file.
+  # Default is false.
+  disable: true
+release:
+  github:
+    owner: IBM
+    name: db2ctl
+  name_template: "db2ctl release - v{{.Version}}"
+  extra_files:
+    - glob: bin/db2ctl

@@ -1,0 +1,28 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+INSTANCENAME={{.Spec.DB2.Required.InstanceName}}
+DATABASENAME={{.Spec.DB2.Required.DatabaseName}}
+DB2VERSION={{.Spec.DB2.Required.DB2Version}}
+
+log ========================================================================
+log "Remove db2 instance {{.Spec.DB2.Required.InstanceName}} entries from /etc/services"
+log ========================================================================
+
+command="sed -i -e '/^DB2_{{.Spec.DB2.Required.InstanceName}}/d' -e '/^db2c_{{.Spec.DB2.Required.InstanceName}}/d' /etc/services"
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+done
+
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

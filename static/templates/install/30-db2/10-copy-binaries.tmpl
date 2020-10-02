@@ -1,0 +1,50 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+DB2VERSION={{.Spec.DB2.Required.DB2Version}}
+
+if [ -d /tmp/db2-binaries-${DB2VERSION} ] ; then
+   /bin/mv -f /tmp/db2-binaries-${DB2VERSION} /tmp/db2ctl-download
+fi   
+
+homeHost=$(hostname)
+cat << EOT > /tmp/copy-db2ctl-download
+# Check if NFS client is mounted or not
+if grep -qs '/misc/nfsshare ' /proc/mounts; then
+    $SSH {{$firstHost}} "mkdir -p /misc/nfsshare/db2ctl-download"
+    /usr/bin/rsync -avP $homeHost:/tmp/db2ctl-download/ /misc/nfsshare/db2ctl-download
+    if [ \$? -ne 0 ] ; then
+       exit 1
+    else
+       exit 0
+    fi      
+else
+    echo "/misc/nfsshare is not mounted on {{$firstHost}}"
+    echo "Files are not copied"
+    exit 1
+fi
+EOT
+
+log ================================================
+log Copy db2ctl-download files to {{$firstHost}}
+log ================================================
+$SSH -tt {{$firstHost}} "/bin/bash -s" -- </tmp/copy-db2ctl-download
+RC=$?
+
+log ================================================
+log List files
+log ================================================
+$SSH {{$firstHost}} "ls -l /misc/nfsshare/db2ctl-download"
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

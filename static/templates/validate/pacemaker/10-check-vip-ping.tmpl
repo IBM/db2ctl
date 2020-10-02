@@ -1,0 +1,97 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+log ========================================================================
+log "Check if VIP given is workable or not"
+log ========================================================================
+
+VIP={{.Spec.NFS.Server.Required.VirtualIP}}
+CIDR={{.Spec.NFS.Server.Required.CIDRNetMask}}
+NIC={{.Spec.NFS.Server.Required.NIC}}
+
+# VIP used is same as physical address of the NIC --> exit. It is not virtual IP address.
+
+log "Check if the $VIP used is same as NIC addr."
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   command="ip addr show dev $NIC"
+   log Run command on $host -- $command
+   RETNIC=$($SSH $host "$command" | grep 'inet ' | awk '{print $2}' | cut -f1 -d'/')
+   log "Returned IP $RETNIC and VIP to be used is $VIP"
+   if [ "$RETNIC" = "$VIP" ] ; then
+      log "VIP=$VIP used is the NIC $NIC address."
+      RC=1
+      break
+   fi   
+   log ========================================================================
+done
+
+log "Check if the $VIP is pingable or not."
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   command="ping -c4 $VIP"
+   log Run command on $host -- $command
+   $SSH $host "$command" > /dev/null 2>&1
+   if [ $? -eq 0 ] ; then
+      log "VIP=$VIP is pingable."
+   else
+      log "VIP=$VIP is NOT pingable."   
+   fi   
+   log ========================================================================
+done
+
+if [ $RC -eq 1 ] ; then
+   echo "VIP used is same as the physical address of the $NIC on one of the host. 
+   Exiting ..."
+   exit 0
+fi   
+
+log "Create $VIP and then ping. Expected result - No packet loss"
+for host1 in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   log "Create VIP on $host1"
+   command="ip address add $VIP/$CIDR dev $NIC"
+   log Run command on $host1 -- $command
+   $SSH $host1 "$command" > /dev/null 2>&1
+   if [ $? -eq 1 ] ; then
+      log "Error: Unable to create VIP=$VIP on $NIC on $host1."
+      RC=1
+   fi
+   command="arping -q -U -c 3 -I $NIC $VIP"
+   log Run command on $host1 -- $command
+   $SSH $host1 "$command"
+   sleep 1
+   log ========================================================================
+   for host2 in {{.Spec.Nodes.Required.NamesAsList}}
+   do
+      command="ping -c4 $VIP"
+      log Run command on $host2 -- $command
+      $SSH $host2 "$command" > /dev/null 2>&1
+      if [ $? -eq 1 ] ; then
+         log "Error: VIP=$VIP is not pingable"
+         RC=1
+      else
+         log "Test passed on host $host2"   
+      fi   
+      log ========================================================================
+   done
+   log "Delete VIP"
+   command="ip address delete $VIP/$CIDR dev $NIC"
+   log Run command on $host1 -- $command
+   $SSH $host1 "$command"
+   if [ $? -eq 1 ] ; then
+      log "Error: Unable to delete VIP=$VIP on $NIC on $host1."
+      RC=1
+   fi
+done      
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

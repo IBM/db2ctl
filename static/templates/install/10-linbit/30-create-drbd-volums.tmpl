@@ -1,0 +1,62 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+{{- $replicated := .Spec.DB2.Required.Replicated}}
+{{- $partitions := sub .Spec.Nodes.Required.Partitions 1}}
+MINOR={{.Spec.Linbit.Optional.VolumeDefinition.Nodes.Minor}}
+
+{{- if $replicated}}
+
+log ========================================================================
+log Create DRBD Volume creation for NODE
+log ========================================================================
+
+{{$MINOR := .Spec.Linbit.Optional.VolumeDefinition.Nodes.Minor}} 
+{{- range $partitionName, $size := .Spec.Nodes.Required.SizePerPartition}}
+
+command="linstor rd c --resource-group red2_NVME {{$partitionName}}"
+log "Run command on {{$firstHost}} -- $command"
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+log ========================================================================
+
+command="linstor volume-definition create --minor {{$MINOR}} {{$partitionName}} {{$size}}"
+log "Run command on {{$firstHost}} -- $command"
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+
+{{$MINOR = add $MINOR 1}}
+log ========================================================================
+{{- end}}
+
+command="linstor controller drbd-options --auto-promote no"
+log "Run command on {{$firstHost}} -- $command"
+$SSH {{$firstHost}} "$command"
+log ========================================================================
+
+{{- range $val1 := .DataToNode}}
+command="linstor r c {{$val1.PrimaryServer}} {{$val1.ReplicaServer}} {{$val1.DBPrimitiveName}} --storage-pool NVMEs"
+log "Run command on {{$firstHost}} -- $command"
+$SSH {{$firstHost}} "$command"
+# test $? -ne 0 && RC=1
+log ========================================================================
+{{- end}}
+
+command="linstor controller drbd-options --auto-promote yes"
+log "Run command on {{$firstHost}} -- $command"
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+
+{{- end}}
+
+log ========================================================================
+end=$SECONDS
+log "$0 took $((end-start)) seconds to complete"
+log ========================================================================
+exit $RC
