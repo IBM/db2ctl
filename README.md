@@ -1,4 +1,4 @@
-# db2ctl
+# DB2CTL
 
 This will help generate pacemaker and corosync configurations, along with linbit.
 
@@ -19,6 +19,8 @@ This will help generate pacemaker and corosync configurations, along with linbit
   - [Examples for cobra cli](#examples-for-cobra-cli)
   - [Bash scripts through go](#bash-scripts-through-go)
   - [Versioning with go](#versioning-with-go)
+  - [Web sockets](#web-sockets)
+  - [Command execution](#command-execution)
 
 <!-- /code_chunk_output -->
 
@@ -61,9 +63,9 @@ db2ctl commands
   - pacemaker   (cleans pacemaker)
   - db2         (cleans db2) - TODO
 
-- status        (displays install status of all components, accepts optional args)
-  - install     ((displays install status of all installed components)
-  - cleanup     ((displays install status of all cleanup components)
+- state        (displays install state of all components, accepts optional args)
+  - install     ((displays install state of all installed components)
+  - cleanup     ((displays install state of all cleanup components)
 
 - version       (displays version info for the application)
   --json                (gives output in JSON)
