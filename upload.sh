@@ -1,6 +1,6 @@
 #!/bin/bash
 
-HEAD="v0.0."
+HEAD="v1.0."
 git fetch
 TAGS=$(git describe --tags --long)
 MINOR=$(echo $TAGS | sed 's/-.*//g' | sed "s/^${HEAD}//g")
