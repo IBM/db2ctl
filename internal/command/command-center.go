@@ -31,7 +31,8 @@ var stateDBPathFromEnv string //This will be set through the build command, see 
 
 //constants needed
 const (
-	SampleConfigFileName = "db2ctl.yaml"
+	SampleConfigFileName = "db2ctl-sample.yaml"
+	ConfigFileName       = "db2ctl.yaml"
 
 	defaultConfigFileName  = "db2ctl-defaults.yaml"
 	stateFileDefaultName   = "db2ctl-state.db"
@@ -100,6 +101,7 @@ func (i *Instance) CreateSampleConfigFile() *Instance {
 		i.Error = err
 	}
 	fmt.Println("\nGenerated sample file : ", SampleConfigFileName)
+	fmt.Println("Copy", SampleConfigFileName, "to", ConfigFileName, "and make edits as per your Db2 cluster.")
 	return i
 }
 

@@ -3,10 +3,8 @@ build:
 build-w-clean: clean build
 build-linux: # example: make build-linux DB_PATH=/dir/to/db
 	env GOOS=linux GOARCH=amd64 go build -ldflags "-X github.com/IBM/db2ctl/internal/command.stateDBPathFromEnv=/tmp -X github.com/IBM/db2ctl/internal/command.logDirPathFromEnv=/var/log/IBM/db2ctl -X github.com/IBM/db2ctl/cmd.gitCommitHash=`git rev-parse HEAD` -X github.com/IBM/db2ctl/cmd.buildTime=`date -u '+%Y-%m-%d--%H:%M:%S%p'` -X github.com/IBM/db2ctl/cmd.gitBranch=`git branch --show-current` -X github.com/IBM/db2ctl/cmd.tagVersion=`git describe --tags --long`" -o bin/db2ctl main.go
-send-fyre: install build-linux
-	scp bin/db2ctl root@db2-pc-test-1-01.fyre.ibm.com:/usr/local/bin
-send-fyre2: install build-linux
-	scp bin/db2ctl root@p-17.fyre.ibm.com:/usr/local/bin
+send-linux: install build-linux
+	scp bin/db2ctl root@p01.zinox.com:/usr/local/bin
 clean:
 	rm -f bin/db2ctl
 	rm -rf generated

@@ -30,14 +30,14 @@ spec:
     required:
       numNodes: 4 #Example: 4, 8, 12 16 etc.
       nvmeList: [[{name: /dev/xvdc, size: 25GB}, {name: /dev/xvde, size: 25GB}, {name: /dev/xvdf, size: 25GB}, {name: /dev/xvdg, size: 25GB}], [{name: /dev/xvdc, size: 25GB}, {name: /dev/xvde, size: 25GB}, {name: /dev/xvdf, size: 25GB}, {name: /dev/xvdg, size: 25GB}], [{name: /dev/xvdc, size: 25GB}, {name: /dev/xvde, size: 25GB}, {name: /dev/xvdf, size: 25GB}, {name: /dev/xvdg, size: 25GB}], [{name: /dev/xvdc, size: 25GB}, {name: /dev/xvde, size: 25GB}, {name: /dev/xvdf, size: 25GB}, {name: /dev/xvdg, size: 25GB}]] # GB or TB only
-      ipAddresses: [10.11.1.134, 10.11.1.135, 10.11.1.242, 10.11.2.20] #Example: [10.xx.xx.xx, 10.xx.xx.xx, ...]
-      names: [db2-pc-test-1-01.fyre.ibm.com, db2-pc-test-1-02.fyre.ibm.com, db2-pc-test-1-03.fyre.ibm.com, db2-pc-test-1-04.fyre.ibm.com] #Example: [e1n1, e2n1, ...]
+      ipAddresses: [10.190.17.14, 10.190.17.1365, 10.190.17.137, 10.190.17.139] #Example: [10.xx.xx.xx, 10.xx.xx.xx, ...]
+      names: [p01g.zinox.com, p02g.zinox.com, p03g.zinox.com, p04g.zinox.com] #Example: [e1n1, e2n1, ...]
       partitions: 24
   nfs:
     server:
       required: 
-        nfsVirtualIP: 10.11.1.2
-        cidrNetmask: 20
+        nfsVirtualIP: 10.190.17.189
+        cidrNetmask: 26
         nic: eth0
     # optional fields
       # optional:
