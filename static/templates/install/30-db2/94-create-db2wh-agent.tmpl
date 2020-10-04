@@ -1,15 +1,8 @@
 #!/bin/bash
 cat << 'EOT' > /tmp/db2wh
-#!/bin/sh
+#!/bin/bash
 #
 # db2wh
-#
-# Resource agent that manages a Db2 LUW instance resource.
-#
-# Copyright (c) 2019-2020 IBM Canada Ltd
-#
-# This work incorporates code included as part of pacemaker 2.0.2
-# Copyright (c) 2011 Holger Teutsch <holger.teutsch@web.de>
 #
 # This agent incoporates code of a previous release created by
 # Alan Robertson and the community.
@@ -103,7 +96,7 @@ END
 #
 runasdb2()
 {
-   su $instName -c "ksh -c '. $instHome/sqllib/db2profile; $*'"
+   su $instName -c "/bin/bash -c '. $instHome/sqllib/db2profile; $*'"
 }
 
 
@@ -304,8 +297,8 @@ db2wh_stop()
          # This is not actually checking if db2gcf exists or not, it is a way for us to check
          # if the mount is hanging or not. And it is important to not cause any hangs in stop
          # since it can lead to a failover to never happen.
-         #/bin/ksh -c "cd $instHome/sqllib/bin; touch $instHome/sqllib/tmp/.tmp.$dbPartNum; rm -f $instHome/sqllib/tmp/.tmp.$dbPartNum" &
-         /bin/ksh -c "test -e $instHome/sqllib/bin/db2gcf" &
+         #/bin/bash -c "cd $instHome/sqllib/bin; touch $instHome/sqllib/tmp/.tmp.$dbPartNum; rm -f $instHome/sqllib/tmp/.tmp.$dbPartNum" &
+         /bin/bash -c "test -e $instHome/sqllib/bin/db2gcf" &
          ProcNum=$!
          sleep 2
 
