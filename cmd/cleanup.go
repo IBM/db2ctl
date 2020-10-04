@@ -10,7 +10,7 @@ var cleanupCmd = &cobra.Command{
 	Short: "Cleanup commands",
 	Long: `Cleanup commands. For example:
 
-	db2ctl cleanup <command> -c db2ctl-sample.yaml`,
+	db2ctl cleanup <command> -c db2ctl.yaml`,
 }
 
 func init() {

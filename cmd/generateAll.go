@@ -15,27 +15,27 @@ Generates configuration files required for pacemaker+corosync application.
 ********************************************************************************************************************************
 1.a In case you want to run with a custom mapping file, first run:
   
-  	 db2ctl generate mapping -c db2ctl-sample.yaml
+  	 db2ctl generate mapping -c db2ctl.yaml
   
     It generates a 'mapping.csv' in 'Generated' directory, which can be edited by the user.
   
     Then, run:
   
-		db2ctl generate config -c db2ctl-sample.yaml -m 
+		db2ctl generate config -c db2ctl.yaml -m 
 
 1.b In case you want to run with a custom binpacking file, first run:
   
-  	 db2ctl generate binpacking -c db2ctl-sample.yaml
+  	 db2ctl generate binpacking -c db2ctl.yaml
   
     It generates a 'binpacking.csv' in 'Generated' directory, which can be edited by the user.
   
     Then, run:
   
-		db2ctl generate config -c db2ctl-sample.yaml -b
+		db2ctl generate config -c db2ctl.yaml -b
 ********************************************************************************************************************************
   2. In case you want to use the default files, run this step:
   
-  	 db2ctl generate config -c db2ctl-sample.yaml
+  	 db2ctl generate config -c db2ctl.yaml
 ********************************************************************************************************************************`,
 
 	RunE: func(cmd *cobra.Command, args []string) error {

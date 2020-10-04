@@ -11,7 +11,7 @@ var linbitCleanupCmd = &cobra.Command{
 	Short: "Cleanup linbit",
 	Long: `Cleanup linbit. For example:
 
-	db2ctl cleanup linbit -c db2ctl-sample.yaml`,
+	db2ctl cleanup linbit -c db2ctl.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		err := command.New(cmd.Flags()).

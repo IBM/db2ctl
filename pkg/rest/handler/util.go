@@ -15,7 +15,7 @@ func getFlags(queryParams map[string][]string) *pflag.FlagSet {
 	var dryRun bool
 	var reRun bool
 
-	flags.StringVarP(&confFile, flag.ConfigurationFile, "c", "db2ctl-sample.yaml", "configuration yaml file needed for application")
+	flags.StringVarP(&confFile, flag.ConfigurationFile, "c", "db2ctl.yaml", "configuration yaml file needed for application")
 	flags.BoolVarP(&dryRun, flag.DryRun, "d", false, "(optional) shows what scripts will run, but does not run the scripts")
 	flags.BoolVarP(&reRun, flag.ReRun, "r", false, "(optional) re-run script from initial state, ignoring previously saved state")
 

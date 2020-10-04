@@ -56,7 +56,7 @@ func init() {
 
 	//rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.IBM/db2ctl.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, flag.Verbose, "v", false, "print verbosely")
-	rootCmd.PersistentFlags().StringVarP(&confFile, flag.ConfigurationFile, "c", "db2ctl-sample.yaml", "configuration yaml file needed for application")
+	rootCmd.PersistentFlags().StringVarP(&confFile, flag.ConfigurationFile, "c", "db2ctl.yaml", "configuration yaml file needed for application")
 	rootCmd.PersistentFlags().BoolVarP(&dryRun, flag.DryRun, "d", false, "(optional) shows what scripts will run, but does not run the scripts")
 	rootCmd.PersistentFlags().BoolVarP(&rerun, flag.ReRun, "r", false, "(optional) re-run script from initial state, ignoring previously saved state")
 	rootCmd.PersistentFlags().BoolVarP(&noGenerate, flag.NoGenerate, "n", false, "(optional) do not generate bash scripts as part of install, instead use the ones in generated folder. Useful for running local change to the scripts")

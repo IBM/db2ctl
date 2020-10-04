@@ -13,7 +13,7 @@ var binpackingCmd = &cobra.Command{
 
 For example:
 
-	db2ctl generate binpacking -c db2ctl-sample.yaml
+	db2ctl generate binpacking -c db2ctl.yaml
 	
 It generates a 'binpacking.csv' in 'Generated' directory, which can be edited by the user. It can then be passed onto the 'config' command.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -14,7 +14,7 @@ Generates a mapping file which can be edited before creating configuration files
 
 For example:
 
-	db2ctl generate mapping -c db2ctl-sample.yaml
+	db2ctl generate mapping -c db2ctl.yaml
 	
 It generates a 'mapping.csv' in 'Generated' directory, which can be edited by the user. It can then be passed onto the 'config' command.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

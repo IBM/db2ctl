@@ -19,27 +19,27 @@ There is an optional mapping file and binpacking file that can be generated, edi
 ********************************************************************************************************************************
 1.a In case you want to edit the generated mapping file, first run:
   
-  	  db2ctl generate mapping -c db2ctl-sample.yaml
+  	  db2ctl generate mapping -c db2ctl.yaml
   
     It generates a 'mapping.csv' in 'Generated' directory, which can be edited by the user.
   
     Then, run:
   
-		db2ctl generate config -c db2ctl-sample.yaml -m 
+		db2ctl generate config -c db2ctl.yaml -m 
 
 1.b In case you want to edit the generated binpacking file, first run:
   
-  	  db2ctl generate binpacking -c db2ctl-sample.yaml
+  	  db2ctl generate binpacking -c db2ctl.yaml
   
     It generates a 'binpacking.csv' in 'Generated' directory, which can be edited by the user.
   
     Then, run:
   
-		db2ctl generate config -c db2ctl-sample.yaml -b
+		db2ctl generate config -c db2ctl.yaml -b
 ********************************************************************************************************************************
   2. In case you want to use the default files, run this step:
   
-  	  db2ctl generate config -c db2ctl-sample.yaml
+  	  db2ctl generate config -c db2ctl.yaml
 ********************************************************************************************************************************
 
 It generates configuration files required for pacemaker+corosync application.

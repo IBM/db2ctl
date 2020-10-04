@@ -416,7 +416,7 @@ cibadmin --erase --force
 systemctl stop pacemaker corosync ; rm -f /etc/corosync/corosync.conf
 crm_mon -1
 ls -l
-cat db2ctl-sample.yaml
+cat db2ctl.yaml
 db2ctl genearte all
 db2ctl generate all
 db2ctl install linbit
@@ -515,7 +515,7 @@ clear
 db2ctl install linbit
 linstor v l -p
 ll
-vi db2ctl-sample.yaml 
+vi db2ctl.yaml 
 db2ctl install pacemaker 
 db2ctl cleanup pacemaker
 db2ctl install pacemaker

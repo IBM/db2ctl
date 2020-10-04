@@ -11,7 +11,7 @@ var cleanupPacemakerCmd = &cobra.Command{
 	Short: "Cleanup pacemaker",
 	Long: `Cleanup pacemaker. For example:
 
-	db2ctl cleanup pacemaker -c db2ctl-sample.yaml`,
+	db2ctl cleanup pacemaker -c db2ctl.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		err := command.New(cmd.Flags()).

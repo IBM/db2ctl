@@ -10,7 +10,7 @@ var installCmd = &cobra.Command{
 	Short: "Install commands",
 	Long: `Install commands. For example:
 
-	db2ctl install <command> -c db2ctl-sample.yaml`,
+	db2ctl install <command> -c db2ctl.yaml`,
 }
 
 func init() {

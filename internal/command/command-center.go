@@ -31,7 +31,7 @@ var stateDBPathFromEnv string //This will be set through the build command, see 
 
 //constants needed
 const (
-	SampleConfigFileName = "db2ctl-sample.yaml"
+	SampleConfigFileName = "db2ctl.yaml"
 
 	defaultConfigFileName  = "db2ctl-defaults.yaml"
 	stateFileDefaultName   = "db2ctl-state.db"

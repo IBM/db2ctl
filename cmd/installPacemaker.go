@@ -11,7 +11,7 @@ var installPacemaker = &cobra.Command{
 	Short: "Install pacemaker",
 	Long: `Install pacemaker. For example:
 
-	db2ctl install pacemaker -c db2ctl-sample.yaml`,
+	db2ctl install pacemaker -c db2ctl.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		err := command.New(cmd.Flags()).

@@ -11,7 +11,7 @@ var cleanupAllCmd = &cobra.Command{
 	Short: "Cleanup all modules",
 	Long: `Cleanup all modules. For example:
 
-	db2ctl cleanup all -c db2ctl-sample.yaml`,
+	db2ctl cleanup all -c db2ctl.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := command.New(cmd.Flags()).
 			ParseYaml(confFile).

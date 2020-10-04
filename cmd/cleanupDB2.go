@@ -11,7 +11,7 @@ var cleanupDB2Cmd = &cobra.Command{
 	Short: "Cleanup db2",
 	Long: `Cleanup db2. For example:
 
-	db2ctl cleanup db2 -c db2ctl-sample.yaml`,
+	db2ctl cleanup db2 -c db2ctl.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		err := command.New(cmd.Flags()).

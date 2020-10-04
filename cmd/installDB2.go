@@ -11,7 +11,7 @@ var installDB2Cmd = &cobra.Command{
 	Short: "Install db2",
 	Long: `Install db2. For example:
 
-	db2ctl install db2 -c db2ctl-sample.yaml`,
+	db2ctl install db2 -c dbctl.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		err := command.New(cmd.Flags()).

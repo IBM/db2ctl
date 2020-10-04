@@ -15,7 +15,7 @@ You can also print the configuration parsed using the '-v' flag.
 
 For example:
 
-	db2ctl parse -c db2ctl-sample.yaml`,
+	db2ctl parse -c db2ctl.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		err := command.New(cmd.Flags()).

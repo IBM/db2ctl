@@ -11,7 +11,7 @@ var runLinbitCmd = &cobra.Command{
 	Short: "Install linbit",
 	Long: `Install linbit. For example:
 
-	db2ctl install linbit -c db2ctl-sample.yaml`,
+	db2ctl install linbit -c db2ctl.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		err := command.New(cmd.Flags()).
