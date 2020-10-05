@@ -28,12 +28,12 @@ type PCConfType struct {
 				DB2Version        string `yaml:"db2Version" validate:"required"`
 				DB2Binary         string `yaml:"db2Binary" validate:"required"`
 				DB2License        string `yaml:"db2License" validate:"required"`
-				NumInstances      int    `yaml:"numInstances" validate:"required"`
-				NumDB             int    `yaml:"numdb" validate:"required"`
 				Organization      string `yaml:"organization" validate:"oneof=row column"`
 			} `yaml:"required"`
 			Optional struct {
-				TopLevelDir string `yaml:"topLevelDir" json:"topLevelDir"`
+				TopLevelDir  string `yaml:"topLevelDir" json:"topLevelDir"`
+				NumInstances int    `yaml:"numInstances" validate:"required"`
+				NumDB        int    `yaml:"numdb" validate:"required"`
 			} `yaml:"optional" json:"optional"`
 		} `yaml:"db2" json:"db2"`
 		Nodes struct {
@@ -85,25 +85,13 @@ type PCConfType struct {
 				} `yaml:"required" json:"required"`
 				Optional struct {
 					Path                    string `yaml:"nfsPath" json:"nfsPath"`
-					PrimitiveName           string `yaml:"primitiveName" json:"primitiveName"`
-					VirtualIPResourceName   string `yaml:"virtualIPResourceName" json:"virtualIPResourceName"`
-					ExportResourceName      string `yaml:"exportResourceName" json:"exportResourceName"`
 					ExportResourceDirectory string `yaml:"exportResourceDirectory" json:"exportResourceDirectory"`
 					MountpointName          string `yaml:"mountpointName" json:"mountpointName"`
-					PacemakerOrderName1     string `yaml:"pacemakerOrderName1" json:"pacemakerOrderName1"`
-					PacemakerOrderName2     string `yaml:"pacemakerOrderName2" json:"pacemakerOrderName2"`
-					PacemakerOrderName3     string `yaml:"pacemakerOrderName3" json:"pacemakerOrderName3"`
-					ColocationName1         string `yaml:"colocationName1" json:"colocationName1"`
-					ColocationName2         string `yaml:"colocationName2" json:"colocationName2"`
-					ColocationName3         string `yaml:"colocationName3" json:"colocationName3"`
 				} `yaml:"optional" json:"-"`
 			} `yaml:"server" json:"server"`
 			Client struct {
 				Optional struct {
-					MountPoint    string `yaml:"mountPoint" json:"mountPoint"`
-					PrimitiveName string `yaml:"primitiveName" json:"primitiveName"`
-					CloneName     string `yaml:"cloneName" json:"cloneName"`
-					OrderName     string `yaml:"orderName" json:"orderName"`
+					MountPoint string `yaml:"mountPoint" json:"mountPoint"`
 				} `yaml:"optional" json:"-"`
 			} `yaml:"client" json:"-"`
 		} `yaml:"nfs" json:"nfs"`

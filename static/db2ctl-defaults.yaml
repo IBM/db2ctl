@@ -21,11 +21,11 @@ spec:
       db2Version:
       db2Binary:
       db2License:
-      numInstances:
-      numdb:
       organization:
     optional:
       topLevelDir: /db2db
+      numInstances: 1
+      numdb: 1
   nodes:
     required:
       numNodes:  
@@ -55,23 +55,10 @@ spec:
         nic: 
       optional:
         nfsPath: /mnt/nfs/nfsserver
-        primitiveName: nfsserver
-        virtualIPResourceName: virtip
-        exportResourceName: exportfs
         exportResourceDirectory: /mnt/nfs
         mountpointName: nfsfs 
-        pacemakerOrderName1: o_exportfs_before_virtip
-        pacemakerOrderName2: o_nfsserver_before_exportfs
-        pacemakerOrderName3: o_nfsfs_before_nfsserver
-        colocationName1: c_virtip_with_exportfs
-        colocationName2: c_exportfs_with_nfsserver
-        colocationName3: c_nfsserver_with_nfsfs
     client:
       optional:
         mountPoint: /misc/nfsshare
-        primitiveName: nfsclient
-        cloneName: cl_nfsclient
-        orderName: o_exportfs_before_cl_nfsclient
-
     
       

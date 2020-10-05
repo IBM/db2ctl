@@ -21,8 +21,6 @@ spec:
       db2Version: 11.5.4.0 # Replace with your name
       db2Binary: v11.5.4_linuxx64_server.tar.gz # Replace with your name
       db2License: db2adv_vpc.lic # Replace with your name
-      numInstances: 1
-      numdb: 1
       organization: row
     # optional: - optional fields can be over-written if included in this file
     #   topLevelDir: /db2db
@@ -30,7 +28,7 @@ spec:
     required:
       numNodes: 4 #Example: 4, 8, 12 16 etc.
       nvmeList: [[{name: /dev/xvdc, size: 25GB}, {name: /dev/xvde, size: 25GB}, {name: /dev/xvdf, size: 25GB}, {name: /dev/xvdg, size: 25GB}], [{name: /dev/xvdc, size: 25GB}, {name: /dev/xvde, size: 25GB}, {name: /dev/xvdf, size: 25GB}, {name: /dev/xvdg, size: 25GB}], [{name: /dev/xvdc, size: 25GB}, {name: /dev/xvde, size: 25GB}, {name: /dev/xvdf, size: 25GB}, {name: /dev/xvdg, size: 25GB}], [{name: /dev/xvdc, size: 25GB}, {name: /dev/xvde, size: 25GB}, {name: /dev/xvdf, size: 25GB}, {name: /dev/xvdg, size: 25GB}]] # GB or TB only
-      ipAddresses: [10.190.17.14, 10.190.17.1365, 10.190.17.137, 10.190.17.139] #Example: [10.xx.xx.xx, 10.xx.xx.xx, ...]
+      ipAddresses: [10.190.17.143, 10.190.17.136, 10.190.17.137, 10.190.17.139] #Example: [10.xx.xx.xx, 10.xx.xx.xx, ...]
       names: [p01g.zinox.com, p02g.zinox.com, p03g.zinox.com, p04g.zinox.com] #Example: [e1n1, e2n1, ...]
       partitions: 24
   nfs:
@@ -39,9 +37,3 @@ spec:
         nfsVirtualIP: 10.190.17.189
         cidrNetmask: 26
         nic: eth0
-    # optional fields
-      # optional:
-      #   primitiveName: mynfsserver
-      #   nfsPath: /mnt/nfs/nfsserver
-    # client:
-    #   optional:

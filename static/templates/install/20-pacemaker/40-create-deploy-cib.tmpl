@@ -23,13 +23,13 @@ do
 done
 
 cat << 'EOF' > $CIBFILE
-primitive {{.Spec.NFS.Server.Optional.ExportResourceName}} exportfs \
+primitive exportfs exportfs \
     params clientspec={{.Spec.NFS.Server.Required.ClientSpec}} directory={{.Spec.NFS.Server.Optional.ExportResourceDirectory}} fsid=1 unlock_on_stop=1 options=rw,sync,no_root_squash,no_all_squash \
     op start interval=0s timeout=40s \
     op stop interval=0s timeout=120s \
     op monitor interval=300s timeout=30s   
 
-primitive {{.Spec.NFS.Client.Optional.PrimitiveName}} Filesystem \
+primitive nfsclient Filesystem \
     params device="{{.Spec.NFS.Server.Required.VirtualIP}}:{{.Spec.NFS.Server.Optional.ExportResourceDirectory}}" \
            directory="{{.Spec.NFS.Client.Optional.MountPoint}}" \
            fstype=nfs options="rw,relatime,vers=4.2,rsize=1048576,wsize=1048576,namlen=255,hard,intr,proto=tcp,port=0,timeo=600,retrans=2,sec=sys,nolock" \
@@ -37,7 +37,7 @@ primitive {{.Spec.NFS.Client.Optional.PrimitiveName}} Filesystem \
            op stop interval=0s timeout=60s \
            op monitor interval=30s timeout=40s
 
-primitive {{.Spec.NFS.Server.Optional.MountpointName}} Filesystem \
+primitive nfsfs Filesystem \
     params device=/dev/drbd{{.Spec.Linbit.Optional.VolumeDefinition.NFS.Minor}} \
            directory={{.Spec.NFS.Server.Optional.ExportResourceDirectory}} \
            fstype=xfs options=inode64,logbsize=256k,noatime,nodiratime \
@@ -45,7 +45,7 @@ primitive {{.Spec.NFS.Server.Optional.MountpointName}} Filesystem \
            op stop interval=0 timeout=60s \
            meta target-role=Started
 
-primitive {{.Spec.NFS.Server.Optional.PrimitiveName}} nfsserver \
+primitive nfsserver nfsserver \
     params nfs_shared_infodir="{{.Spec.NFS.Server.Optional.Path}}" \
            nfs_ip="{{.Spec.NFS.Server.Required.VirtualIP}}" \
     op start interval=0s timeout=40s \
@@ -53,7 +53,7 @@ primitive {{.Spec.NFS.Server.Optional.PrimitiveName}} nfsserver \
     op monitor interval=30s timeout=30s \
     meta target-role=Started
 
-primitive {{.Spec.NFS.Server.Optional.VirtualIPResourceName}} IPaddr2 \
+primitive virtip IPaddr2 \
     params ip={{.Spec.NFS.Server.Required.VirtualIP}} \
            cidr_netmask={{.Spec.NFS.Server.Required.CIDRNetMask}} \
            nic={{.Spec.NFS.Server.Required.NIC}} \
@@ -61,29 +61,29 @@ primitive {{.Spec.NFS.Server.Optional.VirtualIPResourceName}} IPaddr2 \
     op stop interval=0s timeout=20s \
     meta target-role=Started
 
-clone {{.Spec.NFS.Client.Optional.CloneName}} {{.Spec.NFS.Client.Optional.PrimitiveName}} \
+clone cl_nfsclient nfsclient \
     meta target-role=Started
 
-colocation {{.Spec.NFS.Server.Optional.ColocationName2}} \
-      inf: {{.Spec.NFS.Server.Optional.ExportResourceName}} {{.Spec.NFS.Server.Optional.PrimitiveName}}
-colocation {{.Spec.NFS.Server.Optional.ColocationName3}} \
-      inf: {{.Spec.NFS.Server.Optional.PrimitiveName}} {{.Spec.NFS.Server.Optional.MountpointName}}
-colocation {{.Spec.NFS.Server.Optional.ColocationName1}} \
-      inf: {{.Spec.NFS.Server.Optional.VirtualIPResourceName}} {{.Spec.NFS.Server.Optional.ExportResourceName}}
-order {{.Spec.NFS.Server.Optional.PacemakerOrderName1}} \
-      inf: {{.Spec.NFS.Server.Optional.ExportResourceName}} {{.Spec.NFS.Server.Optional.VirtualIPResourceName}}
-order {{.Spec.NFS.Server.Optional.PacemakerOrderName3}} \
-      inf: {{.Spec.NFS.Server.Optional.MountpointName}} {{.Spec.NFS.Server.Optional.PrimitiveName}}
-order {{.Spec.NFS.Server.Optional.PacemakerOrderName2}} \
-      inf: {{.Spec.NFS.Server.Optional.PrimitiveName}} {{.Spec.NFS.Server.Optional.ExportResourceName}}
-order {{.Spec.NFS.Client.Optional.OrderName}} \
-      Optional: {{.Spec.NFS.Server.Optional.ExportResourceName}} {{.Spec.NFS.Client.Optional.CloneName}}
+colocation c_exportfs_with_nfsserver \
+      inf: exportfs nfsserver
+colocation c_nfsserver_with_nfsfs \
+      inf: nfsserver nfsfs
+colocation c_virtip_with_exportfs \
+      inf: virtip exportfs
+order o_exportfs_before_virtip \
+      inf: exportfs virtip
+order o_nfsfs_before_nfsserver \
+      inf: nfsfs nfsserver
+order o_nfsserver_before_exportfs \
+      inf:  nfsserver exportfs
+order o_exportfs_before_cl_nfsclient \
+      Optional: exportfs cl_nfsclient
 
-location lo_nfsserver {{.Spec.NFS.Server.Optional.PrimitiveName}} \      
+location lo_nfsserver nfsserver \      
 EOF
 echo "         rule -inf: $nfshostlist" >> $CIBFILE
 cat << 'EOF' >> $CIBFILE
-location lo_nfsserver_pref {{.Spec.NFS.Server.Optional.PrimitiveName}} rule 100: #uname eq {{$firstHost}}
+location lo_nfsserver_pref nfsserver rule 100: #uname eq {{$firstHost}}
 
 {{- if $replicated}}
 primitive drbd-attr ocf:linbit:drbd-attr

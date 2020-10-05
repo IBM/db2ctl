@@ -13,9 +13,9 @@ log ================================================
 DB2VERSION={{.Spec.DB2.Required.DB2Version}}
 {{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
 INST_NAME={{.Spec.DB2.Required.InstanceName}}
-NUM_INSTANCE={{.Spec.DB2.Required.NumInstances}}
+NUM_INSTANCE={{.Spec.DB2.Optional.NumInstances}}
 INSTANCE_MEMORY=$((94/NUM_INSTANCE))
-NUMDB={{.Spec.DB2.Required.NumDB}}
+NUMDB={{.Spec.DB2.Optional.NumDB}}
 {{- $role := .Spec.DB2.Required.Role}}
 
 {{- if eq $role "optimized"}}
