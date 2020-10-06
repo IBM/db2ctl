@@ -3,11 +3,20 @@
 
 ![Stability](https://img.shields.io/badge/Stability-Tested-green)![GitHub Org's stars](https://img.shields.io/github/stars/IBM?color=%23FF0000&label=IBM%20Open%20Source&style=social) ![GitHub User's stars](https://img.shields.io/github/stars/vikramkhatri?label=Vikram%20Khatri&style=social)
 
+## Philosophy
+
+We follow Eric Raymond’s famous philosophy:
+
+* build small
+* build modular
+* build simple
+
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
 <!-- code_chunk_output -->
 
 - [DB2CTL](#db2ctl)
+  - [Philosophy](#philosophy)
 - [Licenses](#licenses)
 - [Terminology](#terminology)
 - [Commands](#commands)
