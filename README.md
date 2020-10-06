@@ -1,5 +1,8 @@
 # DB2CTL
 
+
+![Stability](https://img.shields.io/badge/Stability-Tested-green)![GitHub Org's stars](https://img.shields.io/github/stars/IBM?color=%23FF0000&label=IBM%20Open%20Source&style=social) ![GitHub User's stars](https://img.shields.io/github/stars/vikramkhatri?label=Vikram%20Khatri&style=social)
+
 This tool generates Linbit (Storage), Pacemaker (HA) and Db2 (Warehouse) deployment scripts.
 
 The minimum deployment unit for production is four servers with storage replication to provide resiliency from a node failue.
@@ -8,7 +11,7 @@ The failure domain is one machine per four servers. It means that you can lose o
 
 # Licenses
 
-The `db2ctl` is free to use. The LinBit software defined storage requires a support licennse on RHEL/CentOS and Db2 requires a commercial license from IBM.
+The `db2ctl` usage is as per [this Apache license](LICENSE). Please read the license. The LinBit software defined storage requires a support licennse on RHEL/CentOS and Db2 requires a commercial license from IBM.
 
 It is possible to evaluate the solution by requesting the trial support license from LinBit and trial license for Db2 from IBM.
 
@@ -17,6 +20,7 @@ It is possible to evaluate the solution by requesting the trial support license 
 <!-- code_chunk_output -->
 
 - [DB2CTL](#db2ctl)
+- [Licenses](#licenses)
   - [Terminology](#terminology)
   - [Commands](#commands)
   - [Building the application](#building-the-application)
@@ -138,3 +142,4 @@ _Note:_ `-c` defaults to `db2ctl.yaml`, so it can be ignored if the file is in t
 `db2ctl cleanup <command> -c db2ctl.yaml`
 
 _Note:_ `-c` defaults to `db2ctl.yaml`, so it can be ignored if the file is in the same directory.
+
