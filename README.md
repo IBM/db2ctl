@@ -3,6 +3,24 @@
 
 ![Stability](https://img.shields.io/badge/Stability-Tested-green)![GitHub Org's stars](https://img.shields.io/github/stars/IBM?color=%23FF0000&label=IBM%20Open%20Source&style=social) ![GitHub User's stars](https://img.shields.io/github/stars/vikramkhatri?label=Vikram%20Khatri&style=social)
 
+<!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
+
+<!-- code_chunk_output -->
+
+- [DB2CTL](#db2ctl)
+- [Licenses](#licenses)
+- [Terminology](#terminology)
+- [Commands](#commands)
+- [Building the application](#building-the-application)
+- [Generate yaml configuration file](#generate-yaml-configuration-file)
+- [Validate config file](#validate-config-file)
+- [Generate all bash configuration files](#generate-all-bash-configuration-files)
+- [Install config files](#install-config-files)
+- [Cleanup](#cleanup)
+
+<!-- /code_chunk_output -->
+
+
 This tool generates Linbit (Storage), Pacemaker (HA) and Db2 (Warehouse) deployment scripts.
 
 The minimum deployment unit for production is four servers with storage replication to provide resiliency from a node failue.
@@ -15,24 +33,7 @@ The `db2ctl` usage is as per [this Apache license](LICENSE). The LinBit software
 
 However, it is possible to evaluate the solution by requesting the trial support license from LinBit for the storage and a trial license for Db2 from IBM.
 
-<!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
-
-<!-- code_chunk_output -->
-
-- [DB2CTL](#db2ctl)
-- [Licenses](#licenses)
-  - [Terminology](#terminology)
-  - [Commands](#commands)
-  - [Building the application](#building-the-application)
-  - [Generate yaml configuration file](#generate-yaml-configuration-file)
-  - [Validate config file](#validate-config-file)
-  - [Generate all bash configuration files](#generate-all-bash-configuration-files)
-  - [Install config files](#install-config-files)
-  - [Cleanup](#cleanup)
-
-<!-- /code_chunk_output -->
-
-## Terminology
+# Terminology
 
 There are 2 different configuration files that are mentioned in this repo:
 
@@ -41,7 +42,7 @@ There are 2 different configuration files that are mentioned in this repo:
 
 In short, the `db2ctl` tool uses a `yaml` config file to create a set of `bash` config files for Linbit, Pacemaker and Db2 for any Db2 production database cluster from 4 nodes to all the way to the 32 nodes.
 
-## Commands
+# Commands
 
 ```
 db2ctl commands
@@ -87,7 +88,7 @@ Global flags
 
 ```
 
-## Building the application
+# Building the application
 
 The following assumes that you are using a MacBook. You may to tweak this for Linux and Windows.
 
@@ -104,7 +105,7 @@ Make sure your `PATH` env variable has `go/bin` included (`export PATH=$PATH:$(g
 8. `make send-linux` to scp the tool to your target RHEL/CentOS machine. You need to modift the Makefile.
 9. `upload.sh` - used by the developers of this tool to release the binary to GitHub.  
 
-## Generate yaml configuration file
+# Generate yaml configuration file
 
 `db2ctl init`
 
@@ -114,7 +115,7 @@ In the spirit of the open-source, please put up a PR if you are making changes t
 
 Copy `db2ctl-sample.yaml` to `db2ctl.yaml` and make changes. 
 
-## Validate config file
+# Validate config file
 
 `db2ctl parse -c db2ctl.yaml`
 
@@ -123,7 +124,7 @@ This will check if the `db2ctl.yaml` is valid or not.
 
 _Note:_ `-c` defaults to `db2ctl.yaml`, so you can omit to specify `-c db2ctl.yaml`, if the file is in the same directory.
 
-## Generate all bash configuration files
+# Generate all bash configuration files
 
 `db2ctl generate all -c db2ctl.yaml`
 
@@ -131,13 +132,13 @@ This will generate all the configuration files needed for the application.
 
 _Note:_ `-c` defaults to `db2ctl.yaml`, so it can be ignored if the file is in the same directory.
 
-## Install config files
+# Install config files
 
 `db2ctl install <command> -c db2ctl.yaml`
 
 _Note:_ `-c` defaults to `db2ctl.yaml`, so it can be ignored if the file is in the same directory.
 
-## Cleanup
+# Cleanup
 
 `db2ctl cleanup <command> -c db2ctl.yaml`
 
