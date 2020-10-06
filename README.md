@@ -11,9 +11,9 @@ The failure domain is one machine per four servers. It means that you can lose o
 
 # Licenses
 
-The `db2ctl` usage is as per [this Apache license](LICENSE). Please read the license. The LinBit software defined storage requires a support licennse on RHEL/CentOS and Db2 requires a commercial license from IBM.
+The `db2ctl` usage is as per [this Apache license](LICENSE). The LinBit software defined storage requires a support license on RHEL/CentOS. The Db2 requires a commercial license from IBM.
 
-It is possible to evaluate the solution by requesting the trial support license from LinBit and trial license for Db2 from IBM.
+However, it is possible to evaluate the solution by requesting the trial support license from LinBit for the storage and a trial license for Db2 from IBM.
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
@@ -89,7 +89,7 @@ Global flags
 
 ## Building the application
 
-Use the following assuming that you have a MacBook. You may to tweak this for Linux and Windows.
+The following assumes that you are using a MacBook. You may to tweak this for Linux and Windows.
 
 1. Clone the repo
 2. `brew install go`
@@ -101,8 +101,8 @@ Make sure your `PATH` env variable has `go/bin` included (`export PATH=$PATH:$(g
 5. `brew install goreleaser`
 6. `make install` to test the tool on your MacBook or Windows laptop.
 7. `make build-linux` to build the GO binary for Linux.
-8. `make send-linux` to scp the tool to your target RHEL/CentOS machine.
-9. `upload.sh` - used by the developers of this tool to release the binray to GitHub.  
+8. `make send-linux` to scp the tool to your target RHEL/CentOS machine. You need to modift the Makefile.
+9. `upload.sh` - used by the developers of this tool to release the binary to GitHub.  
 
 ## Generate yaml configuration file
 
