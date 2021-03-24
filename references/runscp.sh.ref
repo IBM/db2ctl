@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# copy only to first machine
+
+if [[ $# < 1 ]] ; then
+   echo "Usage $0 fullPathofFile" 1>&2
+   exit
+fi
+
+filetocopy=$1
+
+hosts="e3n2 e3n3 e3n4 e4n1 e4n2 e4n3 e4n4"
+
+for h in $hosts
+do
+   echo Copying $filetocopy to $h
+   scp $filetocopy $h:$filetocopy
+done

@@ -1,0 +1,55 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+log ========================================================================
+log Create Local Volumes
+log ========================================================================
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+command="linstor resource-group create --storage-pool NVMEs --layer-list storage local_NVME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && echo RC=1 || echo RC=0
+log ========================================================================
+
+command="linstor volume-group create local_NVME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && echo RC=1 || echo RC=0
+log ========================================================================
+
+{{$SUFFIX := 1}}
+{{- range $host, $nodeInfo := .Spec.Nodes.Required.NodeInfoMap}}
+
+command="linstor rd c --resource-group local_NVME --layer-list storage DB2LOCAL{{$SUFFIX}}"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && echo RC=1 || echo RC=0
+log ========================================================================
+
+command="linstor vd c DB2LOCAL{{$SUFFIX}} {{$nodeInfo.DB2LocalSize}}{{$nodeInfo.Order}}"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && echo RC=1 || echo RC=0
+log ========================================================================
+
+command="linstor r c --storage-pool NVMEs --layer-list storage {{$host}} DB2LOCAL{{$SUFFIX}}"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && echo RC=1 || echo RC=0
+
+{{$SUFFIX = add $SUFFIX 1}}
+
+{{- end}}
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

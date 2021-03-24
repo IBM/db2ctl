@@ -1,0 +1,112 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+## Add cleanup of existing yum run, if any
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   command="test -f /var/run/yum.pid && kill -9 \$(cat /var/run/yum.pid) || echo 'yum not running'"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+done
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   command="yum -y install nfs-utils"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ========================================================================
+   
+   command="yum -y install pacemaker crmsh"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ======================================================================== 
+
+   command="systemctl list-units --all -t service --full --no-legend autofs.service | cut -f1 -d' '"
+   log Run command on $host -- $command
+   SERVICE=$($SSH $host "$command")
+   if [[ "$SERVICE" != "" ]] ; then
+      command="systemctl disable autofs ; systemctl stop autofs"
+      log Run command on $host -- $command
+      $SSH $host "$command"
+      test $? -ne 0 && echo RC=1 || echo RC=0
+   fi
+   log ========================================================================
+
+   command="systemctl list-units --all -t service --full --no-legend multipathd.service | cut -f1 -d' '"
+   log Run command on $host -- $command
+   SERVICE=$($SSH $host "$command")
+   if [[ "$SERVICE" != "" ]] ; then
+      command="systemctl disable multipathd ; systemctl stop multipathd"
+      log Run command on $host -- $command
+      $SSH $host "$command"
+      test $? -ne 0 && echo RC=1 || echo RC=0
+   fi
+   log ========================================================================
+
+   command="systemctl list-units --all -t service --full --no-legend nfs-server.service | cut -f1 -d' '"
+   log Run command on $host -- $command
+   SERVICE=$($SSH $host "$command")
+   if [[ "$SERVICE" != "" ]] ; then
+      command="systemctl disable nfs-server ; systemctl stop nfs-server"
+      log Run command on $host -- $command
+      $SSH $host "$command"
+      test $? -ne 0 && echo RC=1 || echo RC=0
+   fi
+   log ========================================================================
+
+   command="systemctl enable corosync ; systemctl enable pacemaker"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ========================================================================
+
+   command="mkdir -p {{.Spec.NFS.Server.Optional.Path}}"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ========================================================================
+done
+
+## Sanity checks if the previous steps were successful or not
+
+RC=0
+echo  Checking necessary software on all hosts
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   for pkg in "nfs-utils pacemaker corosync crmsh"
+   do
+      command="rpm -q $pkg"
+      log Run command on $host -- $command
+      $SSH $host "$command"
+      if [[ $? -ne 0 ]] ; then
+         log Error: $command did not succeed on the $host
+         RC=1
+      fi   
+   done
+   log ========================================================================
+done
+
+command="linstor v l -p | wc -l"
+log Run command on {{$firstHost}} -- $command
+WC=$($SSH {{$firstHost}} "$command")
+if [[ $WC -le 1 ]] ; then
+   log Error: $command returned less than one volume on $host
+   log Did you configure linbit?
+   RC=1
+fi   
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

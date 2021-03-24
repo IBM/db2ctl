@@ -1,0 +1,140 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+CIBFILE=/tmp/linbit.cib
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+{{- $replicated := .Spec.DB2.Required.Replicated}}
+
+hosts=($($SSH {{$firstHost}} "linstor v l -p" | grep nfs | awk -F "|" '{print $2}'))
+nfshostlist=""
+for (( i=0; i<${#hosts[@]}; i++ ));
+do
+  if [[ i -ge 1 ]] ; then
+    nfshostlist+=" and "
+  fi
+  nfshostlist+="#uname ne ${hosts[i]}"
+done
+
+cat << 'EOF' > $CIBFILE
+primitive exportfs exportfs \
+    params clientspec={{.Spec.NFS.Server.Required.ClientSpec}} directory={{.Spec.NFS.Server.Optional.ExportResourceDirectory}} fsid=1 unlock_on_stop=1 options=rw,sync,no_root_squash,no_all_squash \
+    op start interval=0s timeout=40s \
+    op stop interval=0s timeout=120s \
+    op monitor interval=300s timeout=30s   
+
+primitive nfsclient Filesystem \
+    params device="{{.Spec.NFS.Server.Required.VirtualIP}}:{{.Spec.NFS.Server.Optional.ExportResourceDirectory}}" \
+           directory="{{.Spec.NFS.Client.Optional.MountPoint}}" \
+           fstype=nfs options="rw,relatime,vers=4.2,rsize=1048576,wsize=1048576,namlen=255,hard,intr,proto=tcp,port=0,timeo=600,retrans=2,sec=sys,nolock" \
+           op start interval=0s timeout=60s \
+           op stop interval=0s timeout=60s \
+           op monitor interval=30s timeout=40s
+
+primitive nfsfs Filesystem \
+    params device=/dev/drbd{{.Spec.Linbit.Optional.VolumeDefinition.NFS.Minor}} \
+           directory={{.Spec.NFS.Server.Optional.ExportResourceDirectory}} \
+           fstype=xfs options=inode64,logbsize=256k,noatime,nodiratime \
+           op start interval=0 timeout=60s \
+           op stop interval=0 timeout=60s \
+           meta target-role=Started
+
+primitive nfsserver nfsserver \
+    params nfs_shared_infodir="{{.Spec.NFS.Server.Optional.Path}}" \
+           nfs_ip="{{.Spec.NFS.Server.Required.VirtualIP}}" \
+    op start interval=0s timeout=40s \
+    op stop interval=0s timeout=20s \
+    op monitor interval=30s timeout=30s \
+    meta target-role=Started
+
+primitive virtip IPaddr2 \
+    params ip={{.Spec.NFS.Server.Required.VirtualIP}} \
+           cidr_netmask={{.Spec.NFS.Server.Required.CIDRNetMask}} \
+           nic={{.Spec.NFS.Server.Required.NIC}} \
+    op start interval=0s timeout=20s \
+    op stop interval=0s timeout=20s \
+    meta target-role=Started
+
+clone cl_nfsclient nfsclient \
+    meta target-role=Started
+
+colocation c_exportfs_with_nfsserver \
+      inf: exportfs nfsserver
+colocation c_nfsserver_with_nfsfs \
+      inf: nfsserver nfsfs
+colocation c_virtip_with_exportfs \
+      inf: virtip exportfs
+order o_exportfs_before_virtip \
+      inf: exportfs virtip
+order o_nfsfs_before_nfsserver \
+      inf: nfsfs nfsserver
+order o_nfsserver_before_exportfs \
+      inf:  nfsserver exportfs
+order o_exportfs_before_cl_nfsclient \
+      Optional: exportfs cl_nfsclient
+
+location lo_nfsserver nfsserver \      
+EOF
+echo "         rule -inf: $nfshostlist" >> $CIBFILE
+cat << 'EOF' >> $CIBFILE
+location lo_nfsserver_pref nfsserver rule 100: #uname eq {{$firstHost}}
+
+{{- if $replicated}}
+primitive drbd-attr ocf:linbit:drbd-attr
+clone drbd-attr-clone drbd-attr
+{{- range $val := .Mapping}}
+primitive {{split ($val.DBMountPoint)}} Filesystem \
+       params device={{$val.DBDeviceName}} directory={{$val.DBMountPoint}} \
+       fstype=xfs options=inode64,logbsize=256k,noatime,nodiratime \
+       op start interval="0" timeout="60s" \
+       op stop interval="0" timeout="60s" \
+       meta target-role=Started     
+{{end}}
+{{- range $val1 := .DataToNode}}
+location lo_{{$val1.DBPrimitiveName}} {{$val1.DBPrimitiveName}} \
+       rule -inf: not_defined drbd-promotion-score-{{$val1.DBPrimitiveName}} \
+       rule drbd-promotion-score-{{$val1.DBPrimitiveName}}: defined drbd-promotion-score-{{$val1.DBPrimitiveName}}
+
+location lo_{{$val1.DBPrimitiveName}}_pref {{$val1.DBPrimitiveName}} \
+       rule 100: #uname eq {{$val1.PrimaryServer}}
+{{end}}
+{{end}}
+EOF
+
+cat << 'EOF' >> $CIBFILE
+property cib-bootstrap-options: \
+	stonith-enabled=false
+
+property enable-startup-probes=false
+
+property start-failure-is-fatal=false      
+EOF
+
+log ========================================================================
+command="$SCP $CIBFILE {{$firstHost}}:/tmp"
+log Run scp to copy file on {{$firstHost}} -- $command
+eval "$command"
+command="$SCP /tmp/corosync.conf $host:/etc/corosync"
+
+log ========================================================================
+command="cat $CIBFILE"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+log ========================================================================
+command="crm -F configure load replace $CIBFILE"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && echo RC=1 || echo RC=0
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

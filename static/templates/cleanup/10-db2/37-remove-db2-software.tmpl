@@ -1,0 +1,42 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+start=$SECONDS
+
+INSTANCENAME={{.Spec.DB2.Required.InstanceName}}
+DB2VERSION={{.Spec.DB2.Required.DB2Version}}
+
+log ========================================================================
+log "Remove Db2 software"
+log ========================================================================
+
+# /opt/ibm/db2/11.5.4.0/bin/db2greg -delinstrec instancename=db2wh
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    command="/opt/ibm/db2/$DB2VERSION/bin/db2greg -dump | grep -qs $INSTANCENAME"
+    log Run command on $host -- "$command"
+    $SSH $host $command
+    if [ $? -eq 0 ] ; then
+       log "Deleting $INSTANCENAME entry from db2 registry"
+       command="/opt/ibm/db2/$DB2VERSION/bin/db2greg -delinstrec instancename=$INSTANCENAME"
+       log Run command on $host -- "$command"
+       $SSH $host $command
+    fi
+    command="/opt/ibm/db2/$DB2VERSION/install/db2_deinstall -a -l /tmp/deinstall.log -t /tmp/deinstall.trc"
+    log "Remove Db2 software for version $DB2VERSION from $host"
+    log Run command on $host -- "$command"
+    $SSH $host $command
+    if [ $? -eq 0 ] ; then
+       log "Removing dir /opt/ibm/db2/$DB2VERSION"
+       /bin/rm -fr /opt/ibm/db2/$DB2VERSION
+    fi
+    log ========================================================================
+done    
+
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

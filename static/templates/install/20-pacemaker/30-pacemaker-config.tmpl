@@ -1,0 +1,127 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+log ========================================================================
+log Create a Corosync configuration file
+log ========================================================================
+
+cat <<EOF > /tmp/corosync.conf
+totem {
+  version: 2
+  secauth: off
+  cluster_name: {{.Metadata.ClusterName}}
+  transport: udpu
+}
+nodelist {
+  {{- range $i, $a := .Spec.Nodes.Required.IPAddresses}}
+  {{- $i = add1 $i }}
+  node {
+    ring0_addr: {{$a}}
+    nodeid: {{$i}}
+  }
+  {{- end}}
+}
+quorum {
+  provider: corosync_votequorum
+  two_node: 0
+}
+logging {
+  to_syslog: yes
+}
+EOF
+
+log Copy Corosync config to all nodes
+log ========================================================================
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   command="$SCP /tmp/corosync.conf $host:/etc/corosync"
+   log Run command on $host -- $command
+   eval "$command"
+   log ========================================================================
+done
+
+log Generate authorization key on first host
+command="corosync-keygen"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+log ========================================================================
+
+log Copy authorization key to all nodes except first
+log ========================================================================
+for host in {{excludeFirstHost (.Spec.Nodes.Required.NamesAsList)}}
+do
+   command="$SCP {{$firstHost}}:/etc/corosync/authkey $host:/etc/corosync"
+   log Run command on $host -- $command
+   eval "$command"
+   log ========================================================================
+done
+
+log Start Corosync and Pacemaker on all nodes
+log ========================================================================
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   command="systemctl start corosync pacemaker"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ========================================================================
+done
+
+log Run some basic commands to capture output
+log ========================================================================
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   command="crm_mon -1 | grep 'Current DC' ; crm_node -l"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ========================================================================
+   command="corosync-cfgtool -s"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ========================================================================
+   command="corosync-cmapctl | grep members"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ========================================================================
+   command="pacemakerd --version"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ========================================================================
+   command="crmadmin --version"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ========================================================================
+   command="corosync -v"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ========================================================================
+   command="crm_mon -n -r --as-xml | grep current_dc |  awk '{print $4}' | cut -d'\"' -f2"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ========================================================================
+   command="corosync-quorumtool"
+   log Run command on $host -- $command
+   $SSH $host "$command"
+   test $? -ne 0 && echo RC=1 || echo RC=0
+   log ========================================================================
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

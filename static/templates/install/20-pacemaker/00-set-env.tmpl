@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Put all environment variables here
+
+export SSH="/usr/bin/ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes"
+export SCP="/usr/bin/scp -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes"
+function log {
+   echo $(date +%F-%H-%M-%S) $*
+}
+export RC=0
+
+hostStr=""
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do   
+   $SSH -o PasswordAuthentication=no $host exit &>/dev/null
+   #test $? == 0 && echo can connect || echo cannot connect
+   if [ $? -ne 0 ] ; then
+      hostStr+="$host "
+      RC=1
+   fi   
+done
+
+if [ $RC -eq 1 ] ; then
+   log "Error: Password less SSH is not enabled for hosts -- $hostStr"
+   exit $RC
+fi

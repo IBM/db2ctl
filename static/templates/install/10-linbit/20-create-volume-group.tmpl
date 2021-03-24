@@ -1,0 +1,71 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+log ========================================================================
+log Create volume group
+log ========================================================================
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+{{- range $node, $nodeInfo := .Spec.Nodes.Required.NodeInfoMap}}
+command="linstor physical-storage create-device-pool --pool-name vg_db2 --storage-pool NVMEs LVM {{$node}} {{$nodeInfo.NVMEList}}"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+log ========================================================================
+{{- end}}
+
+log ========================================================================
+log  Display storage pool
+log ========================================================================
+
+command="linstor sp l"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+log ========================================================================
+
+log ========================================================================
+log  Define stripe size so that volumes are striped across all NVMes
+log ========================================================================
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   command="linstor sp set-property $host NVMEs StorDriver/LvcreateOptions '--stripes {{.Spec.Linbit.Optional.NumStripes}} --stripesize {{.Spec.Linbit.Optional.StripeSize}}'"
+   log Run command on {{$firstHost}} -- $command
+   $SSH {{$firstHost}} "$command"
+   test $? -ne 0 && RC=1
+done
+
+log ========================================================================
+log  Create replicated resource group
+log ========================================================================
+command="linstor resource-group create --storage-pool NVMes --place-count 2 red2_NVME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+
+log ========================================================================
+log Set resource group properties
+log ========================================================================
+command="linstor resource-group set-property red2_NVME PeerSlotsNewResource 3"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+
+log ========================================================================
+log Create volume group
+log ========================================================================
+command="linstor volume-group create red2_NVME"
+log Run command on {{$firstHost}}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && RC=1
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

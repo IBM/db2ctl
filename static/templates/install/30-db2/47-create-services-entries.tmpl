@@ -1,0 +1,84 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+DB2PORT=50000 # Replace with a variable
+HOSTS=({{.Spec.Nodes.Required.NamesAsList}})
+INST_NAME={{.Spec.DB2.Required.InstanceName}}
+NUM_NODES={{.Spec.Nodes.Required.NumNodes}}
+TOTAL_PARTITIONS={{.Spec.Nodes.Required.Partitions}}
+MLN_PER_HOST=$((TOTAL_PARTITIONS/NUM_NODES))
+# Our failure domain is 1 machine per 4 machines.
+# Find out how many MLNs will distribute in case one machines in a group of 4 machines
+TOT_PARTITIONS_IN_FAILURE_GROUP=$((MLN_PER_HOST * 4))
+TOT_PARTITIONS_ENTRIES_FOR_DISTRIBUTION=$((TOT_PARTITIONS_IN_FAILURE_GROUP/3))
+# Example: 6 partition node will become 8 partitions 6*4/3
+# Example: 3 partition node will become 4 partitions 3*4/3
+
+log ================================================
+log "Create $INST_NAME entries for /etc/services"
+log ================================================
+
+## db2icrt will create entries in /etc/services
+## When partitions are added in db2nodes.cfg, db2start will add entries in /etc/services for FCM
+## But when we do failover to distribute partitions from failed node to others, we need additional entries
+## This script adds those additional ports for partitions that gets distributed on a node failure. 
+
+## Find out port used by the DB2_.*_END and increment counter by a value 100 (just adhoc)
+## So that we do not have conflict with other db2 instance FCM port range
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    log "Remove db2 instance $INST_NAME entries from /etc/services on $host"
+
+    command="sed -i -e '/^DB2_{{.Spec.DB2.Required.InstanceName}}/d' -e '/^db2c_{{.Spec.DB2.Required.InstanceName}}/d' /etc/services"
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    log ======================================================================== 
+done
+
+## Get entry for any other instance FCM if exists to calculate starting FCM port
+if $SSH {{$firstHost}} 'grep -qEm1 "^DB2_.*?[[:space:]]" /etc/services' ; then
+   FCM_START_PORT=$($SSH {{$firstHost}} "awk '/^DB2_.*?[[:space:]]/ {print \$2;exit}' /etc/services" | awk -F "/tcp" '{print $1}')
+   ((FCM_START_PORT=FCM_START_PORT+100))
+else
+   FCM_START_PORT=60000   
+fi
+
+log "The starting FCM port = $FCM_START_PORT"
+
+> /tmp/services
+echo "db2c_${INST_NAME}	  $DB2PORT/tcp" > /tmp/services
+echo "DB2_${INST_NAME}	  $FCM_START_PORT/tcp" >> /tmp/services
+FCM_PORT=$(($FCM_START_PORT+1))
+for ((i=1; i <(($TOT_PARTITIONS_ENTRIES_FOR_DISTRIBUTION-1)); ++i))
+do
+   echo "DB2_${INST_NAME}_${i}	  $FCM_PORT/tcp" >> /tmp/services
+   ((FCM_PORT=FCM_PORT+1))
+done
+echo "DB2_${INST_NAME}_END	  $FCM_PORT/tcp" >> /tmp/services
+
+log ========================================================================
+log "Generated services entries for $INST_NAME"
+cat /tmp/services
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    log ========================================================================
+    log "Add db2 instance $INST_NAME entries to /etc/services on $host"
+    log ========================================================================
+    
+    log Run command -- 'cat /tmp/services | $SSH $host "cat - >> /etc/services"'
+    cat /tmp/services | $SSH $host "cat - >> /etc/services"
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

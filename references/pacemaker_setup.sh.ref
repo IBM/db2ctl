@@ -1,0 +1,220 @@
+#ips - 10.11.1.134 10.11.1.135 10.11.1.242 10.11.2.20
+
+yum -y install nfs-utils
+
+
+## TODO - Change /etc/nfs/conf file
+
+scp /etc/nfs.conf db2-pc-test-1-02.fyre.ibm.com:/etc
+scp /etc/nfs.conf db2-pc-test-1-03.fyre.ibm.com:/etc
+scp /etc/nfs.conf db2-pc-test-1-04.fyre.ibm.com:/etc
+
+
+runall systemctl disable autofs
+runall systemctl stop autofs
+runall systemctl disable multipathd
+runall systemctl stop multipathd
+runall yum -y install pacemaker
+
+
+runall yum -y install crmsh
+runall systemctl disable nfs-server
+runall systemctl stop nfs-server
+runall systemctl enable corosync
+runall systemctl enable pacemaker
+
+## Create CoroSync config file
+
+cat <<EOF > /etc/corosync/corosync.conf
+totem {
+  version: 2
+  secauth: off
+  cluster_name: db2whcluster
+  transport: udpu
+}
+nodelist {
+  node {
+    ring0_addr: 9.30.188.90
+    nodeid: 1
+  }
+  node {
+    ring0_addr: 9.30.189.120
+    nodeid: 2
+  }
+  node {
+    ring0_addr: 9.30.0.132
+    nodeid: 3
+  }
+  node {
+    ring0_addr: 9.30.1.135
+    nodeid: 4
+  }
+}
+quorum {
+  provider: corosync_votequorum
+  two_node: 0
+}
+logging {
+  to_syslog: yes
+}
+EOF
+
+
+## Copy corosync config to all nodes
+
+cat /etc/corosync/corosync.conf
+scp /etc/corosync/corosync.conf db2-pc-test-1-02.fyre.ibm.com:/etc/corosync
+scp /etc/corosync/corosync.conf db2-pc-test-1-03.fyre.ibm.com:/etc/corosync
+scp /etc/corosync/corosync.conf db2-pc-test-1-04.fyre.ibm.com:/etc/corosync
+
+## Generate auth key
+
+corosync-keygen
+
+
+## Copy authkey to all nodes
+
+scp /etc/corosync/authkey db2-pc-test-1-02.fyre.ibm.com:/etc/corosync
+scp /etc/corosync/authkey db2-pc-test-1-03.fyre.ibm.com:/etc/corosync
+scp /etc/corosync/authkey db2-pc-test-1-04.fyre.ibm.com:/etc/corosync
+
+## Start Corosync + Pacemaker on all nodes
+
+runall systemctl start corosync
+runall systemctl status -l corosync
+runall systemctl start pacemaker
+
+
+## Nodes in Corosync
+crm_node -l
+
+
+## Disable stonith as we are using quorum
+crm configure property stonith-enabled=false
+
+
+# Create nfs server primitive
+
+runall mkdir -p /mnt/nfs/nfsserver
+
+crm -F configure primitive nfsserver ocf:heartbeat:nfsserver params nfs_shared_infodir=/mnt/nfs/nfsserver nfs_ip=10.11.1.2 op start interval=0s timeout=40s op stop interval=0s timeout=20s
+
+crm -F configure primitive virtip ocf:heartbeat:IPaddr2 params ip=10.11.1.2 cidr_netmask=20 nic=eth0 op start interval=0s timeout=20s op stop interval=0s timeout=20s
+
+crm -F configure primitive exportfs ocf:heartbeat:exportfs params clientspec=10.11.0.0/16 directory=/mnt/nfs fsid=1 unlock_on_stop=1 options=rw,no_root_squash,sync,no_subtree_check op start interval=0s timeout=40s op stop interval=0s timeout=120s
+
+crm -F configure primitive nfsfs ocf:heartbeat:Filesystem params device=/dev/drbd3000 directory=/mnt/nfs fstype=xfs options=inode64,logbsize=256k,noatime,nodiratime op start interval="0" timeout="60s" op stop interval="0" timeout="60s"
+
+crm -F configure order o_exportfs_before_virtip inf: exportfs virtip
+crm -F configure order o_nfsserver_before_exportfs inf: nfsserver exportfs
+crm -F configure order o_nfsfs_before_nfsserver inf: nfsfs nfsserver
+
+crm -F configure colocation c_virtip_with_exportfs inf: virtip exportfs
+crm -F configure colocation c_exportfs_with_nfsserver inf: exportfs nfsserver
+crm -F configure colocation c_nfsserver_with_nfsfs inf: nfsserver nfsfs
+
+## Empty /etc/exports
+
+> /etc/exports
+
+# Add NFS client
+runall mkdir -p /misc/nfsshare
+crm -F configure primitive nfsclient ocf:heartbeat:Filesystem params device=10.11.1.2:/mnt/nfs directory=/misc/nfsshare fstype=nfs  options="soft,timeo=50"
+
+crm configure clone nfsclient nfsclient
+
+crm configure order o_nfsserver_before_nfsclient Optional: nfsserver nfsclient
+
+## Resource clean up
+crm_resource -C
+
+
+# Add drbd volumes mount through pacemaker
+
+## Add NODE and DIAG mount primitives
+crm configure primitive NODE0000 ocf:heartbeat:Filesystem params device=/dev/drbd1000 directory=/db2db/db2wh/NODE0000 fstype=xfs options=inode64,logbsize=256k,noatime,nodiratime op start interval="0" timeout="60s" op stop interval="0" timeout="60s"
+
+...
+
+
+## Constrain location of NODE
+
+crm --force configure location lo_NODE0000 NODE0000 rule -inf: \#uname ne db2-pc-test-1-01.fyre.ibm.com and \#uname ne db2-pc-test-1-02.fyre.ibm.com
+crm --force configure location lo_NODE0000_pref NODE0000 rule 100: \#uname eq db2-pc-test-1-01.fyre.ibm.com
+
+crm --force configure location lo_NODE0001 NODE0001 rule -inf: \#uname ne db2-pc-test-1-01.fyre.ibm.com and \#uname ne db2-pc-test-1-02.fyre.ibm.com
+crm --force configure location lo_NODE0001_pref NODE0001 rule 100: \#uname eq db2-pc-test-1-01.fyre.ibm.com
+
+crm --force configure location lo_NODE0002 NODE0002 rule -inf: \#uname ne db2-pc-test-1-01.fyre.ibm.com and \#uname ne db2-pc-test-1-03.fyre.ibm.com
+crm --force configure location lo_NODE0002_pref NODE0002 rule 100: \#uname eq db2-pc-test-1-01.fyre.ibm.com
+
+crm --force configure location lo_NODE0003 NODE0003 rule -inf: \#uname ne db2-pc-test-1-01.fyre.ibm.com and \#uname ne db2-pc-test-1-03.fyre.ibm.com
+crm --force configure location lo_NODE0003_pref NODE0003 rule 100: \#uname eq db2-pc-test-1-01.fyre.ibm.com
+
+crm --force configure location lo_NODE0004 NODE0004 rule -inf: \#uname ne db2-pc-test-1-01.fyre.ibm.com and \#uname ne db2-pc-test-1-04.fyre.ibm.com
+crm --force configure location lo_NODE0004_pref NODE0004 rule 100: \#uname eq db2-pc-test-1-01.fyre.ibm.com
+
+crm --force configure location lo_NODE0005 NODE0005 rule -inf: \#uname ne db2-pc-test-1-01.fyre.ibm.com and \#uname ne db2-pc-test-1-04.fyre.ibm.com
+crm --force configure location lo_NODE0005_pref NODE0005 rule 100: \#uname eq db2-pc-test-1-01.fyre.ibm.com
+
+crm --force configure location lo_NODE0006 NODE0006 rule -inf: \#uname ne db2-pc-test-1-02.fyre.ibm.com and \#uname ne db2-pc-test-1-03.fyre.ibm.com
+crm --force configure location lo_NODE0006_pref NODE0006 rule 100: \#uname eq db2-pc-test-1-02.fyre.ibm.com
+
+crm --force configure location lo_NODE0007 NODE0007 rule -inf: \#uname ne db2-pc-test-1-02.fyre.ibm.com and \#uname ne db2-pc-test-1-03.fyre.ibm.com
+crm --force configure location lo_NODE0007_pref NODE0007 rule 100: \#uname eq db2-pc-test-1-02.fyre.ibm.com
+
+crm --force configure location lo_NODE0008 NODE0008 rule -inf: \#uname ne db2-pc-test-1-02.fyre.ibm.com and \#uname ne db2-pc-test-1-04.fyre.ibm.com
+crm --force configure location lo_NODE0008_pref NODE0008 rule 100: \#uname eq db2-pc-test-1-02.fyre.ibm.com
+
+crm --force configure location lo_NODE0009 NODE0009 rule -inf: \#uname ne db2-pc-test-1-02.fyre.ibm.com and \#uname ne db2-pc-test-1-04.fyre.ibm.com
+crm --force configure location lo_NODE0009_pref NODE0009 rule 100: \#uname eq db2-pc-test-1-02.fyre.ibm.com
+
+crm --force configure location lo_NODE0010 NODE0010 rule -inf: \#uname ne db2-pc-test-1-02.fyre.ibm.com and \#uname ne db2-pc-test-1-01.fyre.ibm.com
+crm --force configure location lo_NODE0010_pref NODE0010 rule 100: \#uname eq db2-pc-test-1-02.fyre.ibm.com
+
+crm --force configure location lo_NODE0011 NODE0011 rule -inf: \#uname ne db2-pc-test-1-02.fyre.ibm.com and \#uname ne db2-pc-test-1-01.fyre.ibm.com
+crm --force configure location lo_NODE0011_pref NODE0011 rule 100: \#uname eq db2-pc-test-1-02.fyre.ibm.com
+
+crm --force configure location lo_NODE0012 NODE0012 rule -inf: \#uname ne db2-pc-test-1-03.fyre.ibm.com and \#uname ne db2-pc-test-1-04.fyre.ibm.com
+crm --force configure location lo_NODE0012_pref NODE0012 rule 100: \#uname eq db2-pc-test-1-03.fyre.ibm.com
+
+crm --force configure location lo_NODE0013 NODE0013 rule -inf: \#uname ne db2-pc-test-1-03.fyre.ibm.com and \#uname ne db2-pc-test-1-04.fyre.ibm.com
+crm --force configure location lo_NODE0013_pref NODE0013 rule 100: \#uname eq db2-pc-test-1-03.fyre.ibm.com
+
+crm --force configure location lo_NODE0014 NODE0014 rule -inf: \#uname ne db2-pc-test-1-03.fyre.ibm.com and \#uname ne db2-pc-test-1-01.fyre.ibm.com
+crm --force configure location lo_NODE0014_pref NODE0014 rule 100: \#uname eq db2-pc-test-1-03.fyre.ibm.com
+
+crm --force configure location lo_NODE0015 NODE0015 rule -inf: \#uname ne db2-pc-test-1-03.fyre.ibm.com and \#uname ne db2-pc-test-1-01.fyre.ibm.com
+crm --force configure location lo_NODE0015_pref NODE0015 rule 100: \#uname eq db2-pc-test-1-03.fyre.ibm.com
+
+crm --force configure location lo_NODE0016 NODE0016 rule -inf: \#uname ne db2-pc-test-1-03.fyre.ibm.com and \#uname ne db2-pc-test-1-02.fyre.ibm.com
+crm --force configure location lo_NODE0016_pref NODE0016 rule 100: \#uname eq db2-pc-test-1-03.fyre.ibm.com
+
+crm --force configure location lo_NODE0017 NODE0017 rule -inf: \#uname ne db2-pc-test-1-03.fyre.ibm.com and \#uname ne db2-pc-test-1-02.fyre.ibm.com
+crm --force configure location lo_NODE0017_pref NODE0017 rule 100: \#uname eq db2-pc-test-1-03.fyre.ibm.com
+
+crm --force configure location lo_NODE0018 NODE0018 rule -inf: \#uname ne db2-pc-test-1-04.fyre.ibm.com and \#uname ne db2-pc-test-1-01.fyre.ibm.com
+crm --force configure location lo_NODE0018_pref NODE0018 rule 100: \#uname eq db2-pc-test-1-04.fyre.ibm.com
+
+crm --force configure location lo_NODE0019 NODE0019 rule -inf: \#uname ne db2-pc-test-1-04.fyre.ibm.com and \#uname ne db2-pc-test-1-01.fyre.ibm.com
+crm --force configure location lo_NODE0019_pref NODE0019 rule 100: \#uname eq db2-pc-test-1-04.fyre.ibm.com
+
+crm --force configure location lo_NODE0020 NODE0020 rule -inf: \#uname ne db2-pc-test-1-04.fyre.ibm.com and \#uname ne db2-pc-test-1-02.fyre.ibm.com
+crm --force configure location lo_NODE0020_pref NODE0020 rule 100: \#uname eq db2-pc-test-1-04.fyre.ibm.com
+
+crm --force configure location lo_NODE0021 NODE0021 rule -inf: \#uname ne db2-pc-test-1-04.fyre.ibm.com and \#uname ne db2-pc-test-1-02.fyre.ibm.com
+crm --force configure location lo_NODE0021_pref NODE0021 rule 100: \#uname eq db2-pc-test-1-04.fyre.ibm.com
+
+crm --force configure location lo_NODE0022 NODE0022 rule -inf: \#uname ne db2-pc-test-1-04.fyre.ibm.com and \#uname ne db2-pc-test-1-03.fyre.ibm.com
+crm --force configure location lo_NODE0022_pref NODE0022 rule 100: \#uname eq db2-pc-test-1-04.fyre.ibm.com
+
+crm --force configure location lo_NODE0023 NODE0023 rule -inf: \#uname ne db2-pc-test-1-04.fyre.ibm.com and \#uname ne db2-pc-test-1-03.fyre.ibm.com
+crm --force configure location lo_NODE0023_pref NODE0023 rule 100: \#uname eq db2-pc-test-1-04.fyre.ibm.com
+
+
+## Order DIAG with NODE - DIAG should start after NODE
+for n in {00..23}; do crm -F configure order o_NODE00${n}_before_DIAG00${n} inf: NODE00${n} DIAG00${n}; done
+
+## DIAG should colocate with NODE.
+
+for n in {00..23}; do crm -F configure colocation c_DIAG00${n}_with_NODE00${n} inf: DIAG00${n} NODE00${n}; done

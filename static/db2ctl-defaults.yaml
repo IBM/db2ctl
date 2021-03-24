@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Configuration
+metadata:
+  name: db2 pacemaker corosync configuration
+  clusterName: db2whcluster
+spec:
+  db2:
+    required:
+      role:
+      replicated:
+      databaseName:
+      instancePort:
+      instanceName:
+      instanceID:
+      instanceGD:
+      fencedID:
+      fencedGD:
+      instanceSecret:
+      fencedName:
+      fencedSecret:
+      db2Version:
+      db2Binary:
+      db2License:
+      organization:
+    optional:
+      topLevelDir: /db2db
+      numInstances: 1
+      numdb: 1
+  nodes:
+    required:
+      numNodes:  
+      nvmeList: 
+      ipAddresses: 
+      names: 
+      partitions: 
+    optional:
+      dbPrimitiveNamePrefix: NODE
+  linbit:
+    optional:
+      numStripes: 
+      stripeSize: 4M
+      volumeDefinition:
+        nodes:
+          size: 
+        nfs:
+          size: 
+          numNFSServers: 4
+        db2local:
+          size: 
+  nfs:
+    server:
+      required: 
+        nfsVirtualIP: 
+        cidrNetmask: 
+        nic: 
+      optional:
+        nfsPath: /mnt/nfs/nfsserver
+        exportResourceDirectory: /mnt/nfs
+        mountpointName: nfsfs 
+    client:
+      optional:
+        mountPoint: /misc/nfsshare
+    
+      

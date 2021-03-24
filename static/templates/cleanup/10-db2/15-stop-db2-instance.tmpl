@@ -1,0 +1,54 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+INSTANCENAME={{.Spec.DB2.Required.InstanceName}}
+DATABASENAME={{.Spec.DB2.Required.DatabaseName}}
+DB2VERSION={{.Spec.DB2.Required.DB2Version}}
+
+log ========================================================================
+log "Stop Db2 instance $INSTANCENAME"
+log ========================================================================
+
+command="ps -ef | grep db2sys[c]"
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+done
+
+log "Stop the Db2 instance $INSTANCENAME" 
+log ======================================================================== 
+$SSH -tt {{$firstHost}} "su - $INSTANCENAME -c 'db2 terminate ; db2stop force'"
+if [ $? -ne 0 ] ; then
+    log "Remove leftover db2sysc processes, if any"
+    log ======================================================================== 
+    command="ps -ef | grep db2sys[c] | awk '{print \$2}'"
+    for host in {{.Spec.Nodes.Required.NamesAsList}}
+    do
+      log Run command on $host -- $command
+      PIDS=$($SSH $host "$command")
+      PIDS=$(echo $PIDS|tr -d '\n')
+      [ -z "$PIDS" ] || $SSH $host "kill -9 $PIDS"
+      log ======================================================================== 
+    done
+fi
+
+command="ps -ef | grep db2sys[c]"
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+  log Run command on $host -- $command
+  $SSH $host "$command"
+  log ======================================================================== 
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

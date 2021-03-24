@@ -1,0 +1,58 @@
+sizes:
+
+NFS server will be 4-way replicated for all configurations.
+The nfsSize will be minimum 10 GB or 10% of the available space on each machine – whichever is smaller and it will be capped to a maximum of 100 GB.
+
+25*4 = per node = 100GB
+
+NFS_SIZE = min(10GB, (10% of raw sizes of all nvmes per host, max of 100GB))
+
+Since we are doing 4-way replication, the NFS_SIZE should be the minimum 
+size of all hosts. min(host1, host2, ...)
+
+
+Placement of NFS servers:
+Formula: Start with 1 and place another by adding the expansion number.
+Expansion 1: 1,2,3,4
+Expansion 2: 1,3,5,7
+Expansion 3: 1,4,7,10
+Expansion 4: 1,5,9,13
+Expansion 5: 1,6,11,16
+Expansion 6: 1,7,13,19
+Expansion 7: 1,8,15,23
+Expansion 8: 1,9,17,25
+
+DB2LOCAL
+The size of the DB2LOCAL will be 40% of the available space on each machine if replicated=true.
+
+If replicated=false, the size of DB2LOCAL will be (numNVMe * sizeNVMe – nfsSize) on each host.
+
+This size can be different on each machine if there is no NFS server on the machine. 
+
+The nfsSize will be zero if the machine does not have a NFS server.
+
+For example: If a machine has 4 NVMe of 25 GB size each – the available space will be:
+When replicated feature is ON – (4x25-10)*0.4/2=18 GB [18,18,18,18]
+
+Formula: (numNVMe * sizeNVMe – nfsSize) * 0.4 / 2
+
+
+NODE
+
+If replicated=false, there is no NODE size calculation. 
+
+we will mount everything under /db2db mount point (node + DB2LOCAL). 
+
+If replicated=true, the size of each database partition will be same 
+within the same machine but it could increase on machine where there is no NFS server. 
+When replicated factor is one (replicated=false), the size of NODE does not 
+change but the replicated size is given to the DB2LOCAL so that we have 
+more space for the use by data load, local backup and restore.
+
+On machines when it is selected to not have replication 
+(example: development environment), we could use that space to stage local 
+backup from the machines having role defined as optimized (aka production).
+
+Available space on each node when replicated: 4x25 – (10 + 18) = 72 / (partitions/numNodes) = 6 GB [6 x 24elements] (per partion)
+Formula: ((numNVMe * sizeNVMe – (nfsSize + db2localSize))) / ((partitions/numNodes) * 2)
+

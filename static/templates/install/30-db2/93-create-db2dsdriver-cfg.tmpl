@@ -1,0 +1,68 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+INST_NAME={{.Spec.DB2.Required.InstanceName}}
+DB_NAME={{.Spec.DB2.Required.DatabaseName}}
+
+log ================================================
+log "Autoconfigure database $DB_NAME under instance $INST_NAME"
+log ================================================
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+cat << EOF > /tmp/db2dsdriver.cfg
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<configuration>
+  <dsncollection>
+    <dsn alias="$DB_NAME" host="localhost" name="$DB_NAME" port="50000"/>
+  </dsncollection>
+
+  <databases>
+    <database host="localhost" name="$DB_NAME" port="50000"/>
+  </databases>
+
+  <parameters>
+    <specialregisters>
+      <parameter name="SET CURRENT REFRESH AGE" value="ANY"/>
+      <parameter name="SET CURRENT MAINTAINED TABLE TYPES FOR OPTIMIZATION" value="USER"/></specialregisters>
+  </parameters>
+
+</configuration>
+EOF
+
+log "File db2dsdriver.cfg to be copied on {{$firstHost}}"
+log ======================================================================== 
+cat /tmp/db2dsdriver.cfg
+
+for host in {{$firstHost}}
+do
+    command="id -u $INST_NAME"
+    log Run command on $getFirstHost -- $command
+    $SSH $host "$command"
+    if [ $? -ne 0 ] ; then
+      log "Instance user $INST_NAME does not exist."
+      exit 1
+    fi  
+    log "Copy db2dsdriver.cfg to $host" 
+    log ========================================================================     
+    command="$SCP -p /tmp/db2dsdriver.cfg $host:/home/$INST_NAME/sqllib/cfg"
+    log Run command on $host -- $command
+    eval $command
+
+    log "Change file permission on db2dsdriver.cfg on $host under instance $INST_NAME"
+    log ======================================================================== 
+    command="chown $INST_NAME.$INST_NAME /home/$INST_NAME/sqllib/cfg"
+    log Run command on $host -- $command
+    $SSH $host $command
+    log ======================================================================== 
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

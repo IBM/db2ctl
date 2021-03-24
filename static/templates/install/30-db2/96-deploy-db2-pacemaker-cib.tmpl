@@ -1,0 +1,67 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+CIBFILE=/tmp/db2wh.cib
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+{{- $replicated := .Spec.DB2.Required.Replicated}}
+{{- if $replicated}}
+cat << 'EOF' > $CIBFILE
+{{- $PARTITION := 0}} 
+{{- range $val1 := .DataToNode}}
+primitive db2_db2wh_{{$PARTITION}} db2wh \
+        params instance=db2wh hostname={{$val1.PrimaryServer}} dbpartitionnum={{$PARTITION }} \
+        op monitor timeout=120s interval=10s on-fail=restart \
+        op start interval=0s timeout=900s \
+        op stop interval=0s timeout=900s \
+        meta migration-threshold=0
+location lo_no-probe-db2_db2wh_{{$PARTITION}} db2_db2wh_{{$PARTITION}} resource-discovery=never rule -inf: #uname ne {{$val1.PrimaryServer}} and #uname ne {{$val1.ReplicaServer}}
+colocation co_db2_db2wh_{{$PARTITION}}_with_{{$val1.DBPrimitiveName}} inf: db2_db2wh_{{$PARTITION}} {{$val1.DBPrimitiveName}}
+order o_{{$val1.DBPrimitiveName}}_before_db2_db2wh_{{$PARTITION}} inf: {{$val1.DBPrimitiveName}} db2_db2wh_{{$PARTITION}}
+order o_cl_nfsclient_before_db2_db2wh_{{$PARTITION}} inf: cl_nfsclient db2_db2wh_{{$PARTITION}}
+{{$PARTITION = add $PARTITION 1}}
+{{- end}}
+EOF
+{{end}}
+
+for host in {{$firstHost}}
+do
+    log "Copy $CIBFILE to $host" 
+    log ========================================================================     
+    command="$SCP -p $CIBFILE $host:/tmp"
+    log Run command on $host -- $command
+    eval $command
+done    
+
+log ========================================================================
+command="cat $CIBFILE"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+log ========================================================================
+command="crm -F configure property maintenance-mode=true"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+log ========================================================================
+command="crm -F configure load update $CIBFILE"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+test $? -ne 0 && echo RC=1 || echo RC=0
+
+log ========================================================================
+command="crm -F configure property maintenance-mode=false"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

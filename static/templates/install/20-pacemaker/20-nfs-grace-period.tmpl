@@ -1,0 +1,44 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+log ========================================================================
+log Change NFS server grace period timeout
+log ========================================================================
+
+## Reduce the NFS server grace period from default 90 seconds to 10 seconds.
+## nfs server config is different on RHEL 7 and RHEL 8
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+   ## Place holder
+   command="grep \"VERSION_ID\" /etc/os-release | awk -F \"\\\"\" '{print \$2}'"
+   log Run command on $host -- $command
+   VERSION=$($SSH $host "$command")
+   if [ "${VERSION}" = "7"] ; then
+      if [ -f /etc/sysconfig/nfs ] ; then
+         if grep -q "=90" /etc/sysconfig/nfs ; then
+            sed -i -e 's/#NFSD_V4_GRACE=90/NFSD_V4_GRACE=10/g' -e 's/#NFSD_V4_LEASE=90/NFSD_V4_LEASE=10/g'  /etc/sysconfig/nfs
+         fi
+      fi
+   elif [ "${VERSION}" = "8"] ; then
+      if [ -f /etc/nfs.conf ] ; then
+         if grep -E "=90$"  /etc/nfs.conf ; then
+            sed -i -e 's/# grace-time=90/grace-time=90/g' -e 's/# lease-time=90/lease-time=90/g' /etc/nfs.conf
+         fi
+      fi
+   else
+      log "The RHEL version is not 7 or 8"
+   fi
+   log ========================================================================
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

@@ -1,0 +1,551 @@
+crm resource locate nfsserver
+crm resource locate nfsserver | grep "NOT running"
+echo $?
+crm resource locate nfsserver
+echo $?
+crm resource 
+crm resource locate nfsserver
+command="crm resource locate nfsserver"
+RESPONSE=$(crm resource locate nfsserver)
+echo $RESPONSE
+RESPONSE=$(crm resource locate nfsserver 2>&1)
+echo $RESPONSE
+if [[] "$RESPONSE" =~ "Not running" ]] ; then echo yes; else echo no; fi
+if [[ "$RESPONSE" =~ "Not running" ]] ; then echo yes; else echo no; fi
+echo $RESPONSE
+if [[ "$RESPONSE" =~ "NOT running" ]] ; then echo yes; else echo no; fi
+umount -f /mnt/nfs
+ls -l
+ls -l /misc
+ls -l
+ps -ef | grep nfs
+ls -l /misc
+ls -l /misc/nfsshare/
+drbdsetup status
+grep -qs '/misc/nfsshare ' /proc/mounts
+echo $?
+ip a s
+ifconfig eth1:1 9.30.0.254 netmask 255.255.0.0
+ip a s
+arping -q -U -c 3 -I eth1 9.30.0.254
+ip a s
+ping -c4 9.30.0.254
+ifconfig eth1:1 down
+ip a s
+cat /etc/hosts
+hostname -I
+ping -c4 9.30.188.89
+drbdadm status
+runall date
+ip a s
+crm_mon -1
+crm resource stop nfsserver
+crm_mon -1Afr --group-by-node
+crm node list
+crm node
+crm node ready db2-pc-test-2-02.fyre.ibm.com
+crm node list
+ssh db2-pc-test-1-02
+ssh -vvv db2-pc-test-1-02
+runall uptime
+crm configure property maintenance-mode=on
+cibadmin --erase --force
+crm_mon -1
+crm configure property maintenance-mode=off
+crm_mon -1
+cibadmin --erase --force
+ip a s
+ping 9.30.0.254
+ifconfig -a
+ip a s
+ifconfig eth1:1 down
+ip a d 9.30.0.254 deb eth1
+ip a d 9.30.0.254 del eth1
+ip a d 9.30.0.254 dev eth1
+ip a d 9.30.0.254/16 dev eth1
+ip a del 9.30.0.254/16 dev eth1
+ip a del 9.30.0.254/32 dev eth1
+ip a s
+runall uptime
+drbdadm status 
+linstor v l -p | grep nfs
+ssh db2-pc-test-2-01.fyre.ibm.com
+ping -c4 9.30.0.254
+ssh db2-pc-test-1-02 ping -c4 9.30.0.254
+runall uptime
+ipcalc 9.30.188.90/23
+grep -l DEVICE.*eth0 /etc/sysconfig/network-scripts/*
+ip -V
+ip a s eth1
+ping -c4 9.30.188.254
+ip a a 9.30.188.254/23 dev eth1
+ip a s
+runall ping -c2 9.30.188.254
+runall ping -c4 9.30.188.254
+ip a s
+ip a d 9.30.188.254/23 dev eth1
+drbdadm status nfs
+drbdadm disconnect nfs
+drbdadm status nfs
+drbdadm connect nfs
+drbdadm status nfs
+ssh db2-pc-test-2-01.fyre.ibm.com
+lsblk
+dmsetup info -C
+dmsetup info -C | grep vg_db2
+dmsetup info -C | grep -qs vg_db2
+echo $?
+dmsetup info -C | grep -qs vg_db22
+echo $?
+dmsetup info -C | grep -qs vg_db2 | awk '{print $1}'
+dmsetup info -C | grep vg_db2 | awk '{print $1}'
+ORPHANLVM=$(dmsetup info -C | grep vg_db2 | awk '{print $1}')
+echo $ORPHANLVM
+cat <<EOF > /tmp/clean-nvme-leftover-lvm
+#!/bin/bash
+
+dmsetup info -C | grep -qs vg_db2
+if [ $? -eq 0 ] ; then
+   ORPHANLVM=$(dmsetup info -C | grep vg_db2 | awk '{print $1}')
+   for lvm in $ORPHANLVM
+   do
+      dmsetup remove $lvm
+   done
+fi
+EOF
+
+cat /tmp/clean-nvme-leftover-lvm
+cat <<'EOF' > /tmp/clean-nvme-leftover-lvm
+#!/bin/bash
+
+dmsetup info -C | grep -qs vg_db2
+if [ $? -eq 0 ] ; then
+   ORPHANLVM=$(dmsetup info -C | grep vg_db2 | awk '{print $1}')
+   for lvm in $ORPHANLVM
+   do
+      dmsetup remove $lvm
+   done
+fi
+EOF
+
+cat /tmp/clean-nvme-leftover-lvm
+cat <<'EOF' > /tmp/clean-nvme-leftover-lvm
+#!/bin/bash
+lsblk
+dmsetup info -C | grep -qs vg_db2
+if [ $? -eq 0 ] ; then
+   ORPHANLVM=$(dmsetup info -C | grep vg_db2 | awk '{print $1}')
+   for lvm in $ORPHANLVM
+   do
+      dmsetup remove $lvm
+   done
+fi
+lsblk
+EOF
+
+cat /tmp/clean-nvme-leftover-lvm
+ssh db2-pc-test-1-01 "/bin/bash -s" -- </tmp/clean-nvme-leftover-lvm
+dmsetup remove --help
+cat <<'EOF' > /tmp/clean-nvme-leftover-lvm
+#!/bin/bash
+echo ========================================================================
+lsblk
+echo ========================================================================
+dmsetup info -C | grep -qs vg_db2
+if [ $? -eq 0 ] ; then
+   ORPHANLVM=$(dmsetup info -C | grep vg_db2 | awk '{print $1}')
+   for lvm in $ORPHANLVM
+   do
+      echo ========================================================================
+      echo "Running command -- dmsetup remove --force $lvm
+      dmsetup remove --force $lvm
+   done
+fi
+echo ========================================================================
+lsblk
+echo ========================================================================
+EOF
+
+cat /tmp/clean-nvme-leftover-lvm
+ssh db2-pc-test-1-01 "/bin/bash -s" -- </tmp/clean-nvme-leftover-lvm
+cat <<'EOF' > /tmp/clean-nvme-leftover-lvm
+#!/bin/bash
+echo ========================================================================
+lsblk
+echo ========================================================================
+dmsetup info -C | grep -qs vg_db2
+if [ $? -eq 0 ] ; then
+   ORPHANLVM=$(dmsetup info -C | grep vg_db2 | awk '{print $1}')
+   for lvm in $ORPHANLVM
+   do
+      echo ========================================================================
+      echo "Running command -- dmsetup remove --force $lvm"
+      dmsetup remove --force $lvm
+   done
+fi
+echo ========================================================================
+lsblk
+echo ========================================================================
+EOF
+
+cat /tmp/clean-nvme-leftover-lvm
+ssh db2-pc-test-1-01 "/bin/bash -s" -- </tmp/clean-nvme-leftover-lvm
+vgdisplay
+ls -l /db2db/db2wh/
+df -h
+cat /proc/mount
+cat /proc/mounts
+cat /proc/mounts | grep -E "^/dev/drbd"
+cat /proc/mounts | grep -E "^/dev/drbd" | awk '{print $2}'
+df -h
+crm_mon -1
+lsof /mnt/nfs
+lsof /dev/drbd3000
+umount -f /dev/drbd3000
+umount -f /var/lib/nfs
+dmsetup -C info
+df -h
+drbdadm down all
+drbdadm wipe-md all
+cat /etc/mtab
+cat /etc/mtab | grep -E "^/dev/drbd"
+echo $?
+cat /etc/mtab | grep -E "^/dev/drbd2"
+echo $?
+sed -e ':^/dev/drbd:d' /etc/mtab
+sed -e '/^\/dev\/drbd/d' /etc/mtab
+df -h
+umount /mnt/nfs
+cat /etc/mtab | grep drbd
+reboot
+df -h
+ip a s
+ping -c2 9.30.188.254
+echo $?
+ping -c2 9.30.188.90
+echo $?
+drbdadm status
+linstor v l -p
+ip a s
+VIP=9.30.188.254
+CIDR=23
+NIC=eth1
+ip address add $VIP/$CIDR dev $NIC
+ip a s eth1
+ping -c4 $VIP
+ssh db2-pc-test-1-02.fyre.ibm.com ping -c4 $VIP
+ssh db2-pc-test-2-02.fyre.ibm.com ping -c4 $VIP
+ssh db2-pc-test-1-01.fyre.ibm.com ping -c4 $VIP
+echo $?
+ip address delete $VIP/$CIDR dev $NIC
+ip a s eth1
+VIP=9.30.188.254
+CIDR=23
+NIC=eth1
+ip address add $VIP/$CIDR dev $NIC
+ip a s
+ssh db2-pc-test-1-01 ping -c4 $VIP
+ssh db2-pc-test-1-02 ping -c4 $VIP
+ssh db2-pc-test-2-01 ping -c4 $VIP
+ssh db2-pc-test-2-02 ping -c4 $VIP
+ssh db2-pc-test-2-01 ip a s
+ssh db2-pc-test-2-01 ping -c4 $VIP
+ssh db2-pc-test-2-01 ipcalc 9.30.188.254/23
+ip route get 9.30.188.254
+ip ne
+ip a s
+ip a d 9.30.188.254
+ip a d 9.30.188.254 dev eth1
+ip a d 9.30.188.254/23 dev eth1
+ip a s
+ip address add $VIP/$CIDR dev $NIC
+ip a s
+ip address del $VIP/$CIDR dev $NIC
+ip a s
+runall uptime
+ip address del $VIP/16 dev eth1
+ip a s
+systemctl restart network
+ip a s
+reboot
+ip a s
+ip addr (ip a)
+hostname -I | awk '{print $1}'
+cat /etc/hosts
+hostname -A
+ip -4 a s
+ip -4 a s eth1
+ip -4 a s dev eth1
+ip l s eth1
+ip link show
+ip link show dev eth1
+ip a s dev eth1
+ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -f1 -d'/'
+ip addr show eth1 | grep 'inet ' | awk '{print $2}' | cut -f1 -d'/'
+ip a s
+ping -c4 9.30.188.254
+echo $?
+ip a s eth1
+crm_mon
+w
+exit
+db2ctl state
+w
+exit
+# Check if NFS client is mounted or not
+if grep -qs '/misc/nfsshare ' /proc/mounts; then     /usr/bin/ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes db2-pc-test-1-01.fyre.ibm.com "mkdir -p /misc/nfsshare/db2-binaries-11.5.4.0";     /usr/bin/scp -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes db2-pc-test-1-01.fyre.ibm.com:/tmp/db2-binaries/v11.5.4_linuxx64_server.tar.gz /misc/nfsshare/db2-binaries-11.5.4.0;     /usr/bin/scp -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes db2-pc-test-1-01.fyre.ibm.com:/tmp/db2-binaries/db2adv_vpc.lic /misc/nfsshare/db2-binaries-11.5.4.0;     exit 0; else     echo "/misc/nfsshare is not mounted on db2-pc-test-1-01.fyre.ibm.com";     echo "Files are not copied";     exit 1; fi
+if grep -qs '/misc/nfsshare ' /proc/mounts; then     cd /misc/nfsshare/db2-binaries-11.5.4.0;     tar xvfz v11.5.4_linuxx64_server.tar.gz;     exit 0; else     echo "/misc/nfsshare is not mounted on db2-pc-test-1-01.fyre.ibm.com";     exit 1; fi
+# Check if NFS client is mounted or not
+if grep -qs '/misc/nfsshare ' /proc/mounts; then     if [ -d /misc/nfsshare/db2-binaries/server*/db2 ] ; then         /usr/bin/scp -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes /misc/nfsshare/db2-binaries/server*/db2/spec db2-pc-test-1-01.fyre.ibm.com:/tmp;     else         echo "Dir /misc/nfsshare/db2-binaries/server*/db2 does not exist. Did you untar?";         exit 1;     fi;     exit 0; else     echo "/misc/nfsshare is not mounted on db2-pc-test-1-01.fyre.ibm.com";     exit 1; fi
+cd /misc/nfsshare/db2-binaries-11.5.4.0/server*
+rm -fr /opt/ibm/db2/11.5.4.0
+./db2_install -p server -y -f noencryption -l /tmp/db2install.log -f NOTSAMP -b /opt/ibm/db2/11.5.4.0
+exit 0
+#!/bin/bash
+    echo Remove existing license - Ignore if it gives error
+    /opt/ibm/db2/11.5.4.0/adm/db2licm -r db2aese
+    echo "Apply license"
+    /opt/ibm/db2/11.5.4.0/adm/db2licm -a /misc/nfsshare/db2-binaries-11.5.4.0/db2adv_vpc.lic
+    echo "List License"
+    /opt/ibm/db2/11.5.4.0/adm/db2licm -l
+    exit
+#!/bin/bash
+cd /misc/nfsshare
+mkdir -p sqllib-db2wh
+chown db2wh.db2wh sqllib-db2wh
+cd /home/db2wh
+ln -s /misc/nfsshare/sqllib sqllib-db2wh
+cd sqllib
+/bin/rm -fr *.* * .*
+# The following line will be a problem if we allow multiple db2 instances
+[ -f /var/db2/global.reg ] && /bin/rm -f /var/db2/global.reg
+/opt/ibm/db2/11.5.4.0/instance/db2icrt -s ese -a SERVER -p 50000 -u db2fenc1 db2wh
+exit 0
+#!/bin/bash
+su - db2wh
+exit
+#!/bin/bash
+su - db2wh
+exit
+#!/bin/bash
+su - db2wh
+exit
+su - db2wh
+#!/bin/bash
+cat << 'EOF' > /tmp/dropdb
+#!/bin/bash
+instanceName=db2wh
+which db2
+if [ $? -eq 0 ] ; then
+  echo "Stopping db2 instance"
+  db2gcf -i $instanceName -s && db2stop force
+  echo "Starting db2 instance"
+  db2gcf -i $instanceName -s || db2start
+  if [ $? -eq 0 ] ; then
+    DBNAMES=$(db2 list db directory | grep "Database name" | awk -F "=" '{print $2}')
+    echo Databases to be dropped : $DBNAMES
+    if [ "x$DBNAMES" = "x" ] ; then
+      echo "No database found for cleanup in Db2 instance $instanceName"
+    else
+      for db in $DBNAMES
+      do
+          echo "Processing database $db for cleanup in Db2 instance $instanceName"
+          db2 drop db $db
+      done
+    fi
+    echo "Stop db2 instance $instanceName"
+    db2stop force
+  else
+    echo "Instance did not start due to some error"
+  fi  
+else
+  echo "db2 not found"
+fi
+exit
+EOF
+
+chmod +x /tmp/dropdb
+DB2LS=$(which db2ls)
+if [ "x$DB2LS" != "x" ] ; then   DB2PATH=$(db2ls -c | grep -vE "^#" | awk -F ":" '{print $1}');   for db2path in $DB2PATH;   do     if [ "xdb2path" != "x" ] ; then        INSTANCE_LIST=$($db2path/instance/db2ilist);        if [ "x$INSTANCE_LIST" = "x" ] ; then           echo "No db2 instance found";           $db2path/install/db2_deinstall -a -l /tmp/$db2_deinstall.log -t /tmp/db2_deinstall.trc;        else          for instance in $INSTANCE_LIST;          do             if [ "$instance" = "db2wh" ] ; then               echo "Processing database cleanup in $instance instance";               su - $instance /tmp/dropdb;               echo "Processing Instance $instance for cleanup";               $db2path/instance/db2idrop db2wh;               $db2path/install/db2_deinstall -a -l /tmp/${instance}_deinstall.log -t /tmp/${instance}_deinstall.trc;               /bin/rm -fr $db2path;             else               echo "Skipping instance $instance" ;             fi  ;          done;        fi;     else        echo "db2 path not found to delete instances and databases";     fi;   done; else   echo "db2ls did not output the result"; fi
+exit
+# Check if NFS client is mounted or not
+if grep -qs '/misc/nfsshare ' /proc/mounts; then     /usr/bin/ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes db2-pc-test-1-01.fyre.ibm.com "mkdir -p /misc/nfsshare/db2-binaries-11.5.4.0";     /usr/bin/scp -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes db2-pc-test-1-01.fyre.ibm.com:/tmp/db2-binaries/v11.5.4_linuxx64_server.tar.gz /misc/nfsshare/db2-binaries-11.5.4.0;     /usr/bin/scp -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes db2-pc-test-1-01.fyre.ibm.com:/tmp/db2-binaries/db2adv_vpc.lic /misc/nfsshare/db2-binaries-11.5.4.0;     exit 0; else     echo "/misc/nfsshare is not mounted on db2-pc-test-1-01.fyre.ibm.com";     echo "Files are not copied";     exit 1; fi
+if grep -qs '/misc/nfsshare ' /proc/mounts; then     cd /misc/nfsshare/db2-binaries-11.5.4.0;     tar xvfz v11.5.4_linuxx64_server.tar.gz;     exit 0; else     echo "/misc/nfsshare is not mounted on db2-pc-test-1-01.fyre.ibm.com";     exit 1; fi
+cd /misc/nfsshare/db2-binaries-11.5.4.0/server*
+rm -fr /opt/ibm/db2/11.5.4.0
+./db2_install -p server -y -f noencryption -l /tmp/db2install.log -f NOTSAMP -b /opt/ibm/db2/11.5.4.0
+exit 0
+#!/bin/bash
+    echo Remove existing license - Ignore if it gives error
+    /opt/ibm/db2/11.5.4.0/adm/db2licm -r db2aese
+    echo "Apply license"
+    /opt/ibm/db2/11.5.4.0/adm/db2licm -a /misc/nfsshare/db2-binaries-11.5.4.0/db2adv_vpc.lic
+    echo "List License"
+    /opt/ibm/db2/11.5.4.0/adm/db2licm -l
+    exit
+#!/bin/bash
+cd /misc/nfsshare
+mkdir -p sqllib-db2wh
+chown db2wh.db2wh sqllib-db2wh
+cd /home/db2wh
+ln -s /misc/nfsshare/sqllib-db2wh sqllib 
+cd sqllib
+/bin/rm -fr *.* * .*
+# The following line will be a problem if we allow multiple db2 instances
+[ -f /var/db2/global.reg ] && /bin/rm -f /var/db2/global.reg
+/opt/ibm/db2/11.5.4.0/instance/db2icrt -s ese -a SERVER -p 50000 -u db2fenc1 db2wh
+exit 0
+#!/bin/bash
+su - db2wh
+exit
+#!/bin/bash
+su - db2wh
+exit
+#!/bin/bash
+su - db2wh
+exit
+su - db2wh
+exit
+  su - db2wh
+  exit
+  su - db2wh
+  exit
+ip a s
+crm_mon -1
+cibadmin --erase --force
+systemctl stop pacemaker corosync ; rm -f /etc/corosync/corosync.conf
+crm_mon -1
+ls -l
+cat db2ctl.yaml
+db2ctl genearte all
+db2ctl generate all
+db2ctl install linbit
+db2ctl install pacemaker
+crm node list
+crm node status
+crm_mon -1
+crm node online db2-pc-test-1-03.fyre.ibm.com
+crm node online db2-pc-test-1-04.fyre.ibm.com
+crm_mon -1
+vi /bin/runall
+runall uptime
+crm_resource -C
+crm_mon -1
+crm cluster stop
+crm cluster start
+crm_mon -1
+crm cluster stop
+crm_mon -1
+crm cluster start
+crm_mon -1
+crm cluster start
+crm_mon -1
+crm_resource -P
+crm_resource -C
+crm node status
+crm_mon -1
+crm node standby db2-pc-test-1-03.fyre.ibm.com
+crm node standby db2-pc-test-1-04.fyre.ibm.com
+crm_mon -1Afr --group-by-node
+crm node online db2-pc-test-1-04.fyre.ibm.com
+crm_mon -1Afr --group-by-node
+db2ctl cleanup pacemaker
+db2ctl install pacemaker
+crm_mon -1Afr --group-by-node
+db2ctl install db2
+rm -fr generated/
+db2ctl generate all
+db2ctl install db2
+db2ctl cleanup db2
+
+db2ctl cleanup db2
+db2ctl install db2
+crm_mon -1
+#!/bin/bash
+cat << 'EOF' > /tmp/dropdb
+#!/bin/bash
+instanceName=db2wh
+which db2
+if [ $? -eq 0 ] ; then
+  echo "Stopping db2 instance"
+  db2gcf -i $instanceName -s && db2stop force
+  echo "Starting db2 instance"
+  db2gcf -i $instanceName -s || db2start
+  if [ $? -eq 0 ] ; then
+    DBNAMES=$(db2 list db directory | grep "Database name" | awk -F "=" '{print $2}')
+    echo Databases to be dropped : $DBNAMES
+    if [ "x$DBNAMES" = "x" ] ; then
+      echo "No database found for cleanup in Db2 instance $instanceName"
+    else
+      for db in $DBNAMES
+      do
+          echo "Processing database $db for cleanup in Db2 instance $instanceName"
+          db2 drop db $db
+      done
+    fi
+    echo "Stop db2 instance $instanceName"
+    db2stop force
+  else
+    echo "Instance did not start due to some error"
+  fi  
+else
+  echo "db2 not found"
+fi
+exit
+EOF
+
+chmod +x /tmp/dropdb
+DB2LS=$(which db2ls)
+if [ "x$DB2LS" != "x" ] ; then   DB2PATH=$(db2ls -c | grep -vE "^#" | awk -F ":" '{print $1}');   for db2path in $DB2PATH;   do     if [ "xdb2path" != "x" ] ; then        INSTANCE_LIST=$($db2path/instance/db2ilist);        if [ "x$INSTANCE_LIST" = "x" ] ; then           echo "No db2 instance found";           $db2path/install/db2_deinstall -a -l /tmp/$db2_deinstall.log -t /tmp/db2_deinstall.trc;        else          for instance in $INSTANCE_LIST;          do             if [ "$instance" = "db2wh" ] ; then               echo "Processing database cleanup in $instance instance";               su - $instance /tmp/dropdb;               echo "Processing Instance $instance for cleanup";               $db2path/instance/db2idrop db2wh;               $db2path/install/db2_deinstall -a -l /tmp/${instance}_deinstall.log -t /tmp/${instance}_deinstall.trc;               /bin/rm -fr $db2path;             else               echo "Skipping instance $instance" ;             fi  ;          done;        fi;     else        echo "db2 path not found to delete instances and databases";     fi;   done; else   echo "db2ls did not output the result"; fi
+exit
+w
+linstor n l
+db2ctl state
+mv /tmp/execution-status.db db2ctl-state.db
+cat 
+/tmp/db2ctl-state.db
+cat /tmp/db2ctl-state.db
+ll
+mv db2ctl-state.db /tmp/
+db2ctl cleanup all 
+db2ctl cleanup all -r
+linstor n l
+db2ctl version
+clear
+db2ctl install linbit
+linstor v l -p
+ll
+vi db2ctl.yaml 
+db2ctl install pacemaker 
+db2ctl cleanup pacemaker
+db2ctl install pacemaker
+db2ctl cleanup pacemaker 
+db2ctl install pacemaker 
+dfh
+ll
+ll generated/
+ll generated/install/
+exit
+watch db2ctl state
+db2ctl version
+clear
+watch db2ctl state
+watch db2ctl state install
+db2ctl state 
+watch db2ctl state install
+watch db2ctl state install db2
+watch db2ctl state 
+watch db2ctl state cleanup
+watch db2ctl state 
+watch -t db2ctl state 
+watch -t db2ctl state pacemaker
+watch -t db2ctl state install pacemaker
+watch -t db2ctl state install 
+watch -t db2ctl state 
+db2ctl state
+watch -t db2ctl state 
+db2ctl state
+db2ctl state pacemaker
+db2ctl state cleanup pacemaker
+db2ctl state 
+exit

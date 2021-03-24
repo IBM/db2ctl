@@ -1,0 +1,35 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+log ================================================
+log Db2 binary install on all hosts
+log ================================================
+
+DB2VERSION={{.Spec.DB2.Required.DB2Version}}
+
+cat << EOT > /tmp/install-db2-binary
+cd /misc/nfsshare/db2ctl-download/server*
+rm -fr /opt/ibm/db2/$DB2VERSION
+./db2_install -p server -y -f noencryption -l /tmp/db2install.log -f NOTSAMP -b /opt/ibm/db2/$DB2VERSION
+exit $?
+EOT
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    log Db2 binary install on $host 
+    log ======================================================================== 
+    $SSH -tt $host "/bin/bash -s" -- </tmp/install-db2-binary  
+    RC=$?
+    test $? -eq 0 || exit 1
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

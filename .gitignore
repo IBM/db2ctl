@@ -1,0 +1,43 @@
+# Folder view configuration files
+.vscode/*
+__debug_bin
+Desktop.ini
+
+# Thumbnail cache files
+._*
+Thumbs.db
+
+# Files that might appear on external disks
+.Spotlight-V100
+.Trashes
+
+.bash_history_fyre.ref
+
+# Compiled Python files
+*.pyc
+
+# Compiled C++ files
+*.out
+
+#binary
+bin/
+
+#logs
+logs/
+*.log
+
+#DS Store
+.DS_Store
+
+#statik
+statik/statik.go
+
+# generated files
+generated/*
+!generated/*.md
+
+# db
+*.db
+
+# Releases
+dist/

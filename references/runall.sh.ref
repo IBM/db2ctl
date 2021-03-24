@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# copy to all machines
+
+hosts="e3n1.fbond e3n2.fbond e3n3.fbond e3n4.fbond e4n1.fbond e4n2.fbond e4n3.fbond e4n4.fbond"
+
+for h in $hosts
+do
+   echo Running "$@" on $h
+   ssh $h "$@"
+done

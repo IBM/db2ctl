@@ -1,0 +1,60 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+HOSTS=({{.Spec.Nodes.Required.NamesAsList}})
+INST_NAME={{.Spec.DB2.Required.InstanceName}}
+NUM_NODES={{.Spec.Nodes.Required.NumNodes}}
+TOTAL_PARTITIONS={{.Spec.Nodes.Required.Partitions}}
+MLN_PER_HOST=$((TOTAL_PARTITIONS/NUM_NODES))
+
+command="id -u $INST_NAME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+if [ $? -ne 0 ] ; then
+   log "Instance user $INST_NAME does not exist."
+   exit 1
+fi  
+
+log ================================================
+log "Create db2nodes.cfg for $INST_NAME"
+log ================================================
+
+> /tmp/db2nodes.cfg
+p=0
+q=0
+for ((i=0; i <$TOTAL_PARTITIONS; ++i))
+do
+   echo $i ${HOSTS[q]} $p >> /tmp/db2nodes.cfg
+   if [ $p -lt $(($MLN_PER_HOST-1)) ] ; then
+      ((p=p+1))
+   else
+      p=0
+      ((q=q+1))
+   fi
+done
+
+log "Generated db2nodes.cfg file"
+log ======================================================================== 
+cat /tmp/db2nodes.cfg
+
+for host in {{$firstHost}}
+do
+    log Copy db2nodes.cfg to $host and set file ownership
+    log ======================================================================== 
+    $SCP /tmp/db2nodes.cfg $host:/home/$INST_NAME/sqllib
+    command="chown $INST_NAME.$INST_NAME /home/$INST_NAME/sqllib"
+    log Run command on $host -- $command
+    $SSH $host "$command"
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

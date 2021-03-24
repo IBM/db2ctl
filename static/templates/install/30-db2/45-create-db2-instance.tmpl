@@ -1,0 +1,94 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+log ================================================
+log "Create Db2 Instance {{.Spec.DB2.Required.InstanceName}} on all hosts"
+log ================================================
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+DB2VERSION={{.Spec.DB2.Required.DB2Version}}
+INSTANCE_ID={{.Spec.DB2.Required.InstanceID}}
+INSTANCE_GD={{.Spec.DB2.Required.InstanceGD}}
+FENCED_ID={{.Spec.DB2.Required.FencedID}}
+FENCED_GD={{.Spec.DB2.Required.FencedGD}}
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    command="id -g {{.Spec.DB2.Required.InstanceName}} &>/dev/null || groupadd -g $INSTANCE_GD {{.Spec.DB2.Required.InstanceName}}"
+    log Run command on $host -- $command    
+    $SSH $host "$command"
+    log ========================================================================
+
+    command="id -u {{.Spec.DB2.Required.InstanceName}} &>/dev/null || useradd -u $INSTANCE_ID -g $INSTANCE_GD -m -d /home/{{.Spec.DB2.Required.InstanceName}} {{.Spec.DB2.Required.InstanceName}}"
+    log Run command on $host -- $command    
+    $SSH $host "$command"
+    log ========================================================================
+
+    command="echo '{{.Spec.DB2.Required.InstanceName}}:{{.Spec.DB2.Required.InstanceSecretVal}}' | chpasswd"
+    log Run command on $host -- "echo '{{.Spec.DB2.Required.InstanceName}}:*********' | chpasswd"    
+    $SSH $host "$command"
+    log ========================================================================
+
+    command="id -g {{.Spec.DB2.Required.FencedName}} &>/dev/null || groupadd -g $FENCED_GD {{.Spec.DB2.Required.FencedName}}"
+    log Run command on $host -- $command    
+    $SSH $host "$command"
+    log ========================================================================
+
+    command="id -u {{.Spec.DB2.Required.FencedName}} &>/dev/null || useradd -u $FENCED_ID -g $FENCED_GD -m -d /home/{{.Spec.DB2.Required.FencedName}} {{.Spec.DB2.Required.FencedName}}"
+    log Run command on $host -- $command  
+    $SSH $host "$command"
+    log ========================================================================
+
+    command="echo '{{.Spec.DB2.Required.FencedName}}:{{.Spec.DB2.Required.FencedSecretVal}}' | chpasswd"
+    log Run command on $host -- "echo '{{.Spec.DB2.Required.FencedName}}:*********' | chpasswd"    
+    $SSH $host "$command"
+    log ========================================================================
+
+    log "Remove db2 instance $INST_NAME entries from /etc/services"
+    command="sed -i -e '/^DB2_{{.Spec.DB2.Required.InstanceName}}/d' -e '/^db2c_{{.Spec.DB2.Required.InstanceName}}/d' /etc/services"
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    log ========================================================================
+done
+
+for host in {{$firstHost}}
+do
+    log "Create sqllib on NFS share" 
+    log ========================================================================
+    command="mkdir -p /misc/nfsshare/sqllib-{{.Spec.DB2.Required.InstanceName}}"
+    log Run command on $host -- $command    
+    $SSH $host "$command"
+    
+    log ========================================================================
+    command="chown {{.Spec.DB2.Required.InstanceName}}.{{.Spec.DB2.Required.InstanceName}} /misc/nfsshare/sqllib-{{.Spec.DB2.Required.InstanceName}}"
+    log Run command on $host -- $command    
+    $SSH $host "$command"
+done
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    command="ln -s /misc/nfsshare/sqllib-{{.Spec.DB2.Required.InstanceName}} /home/{{.Spec.DB2.Required.InstanceName}}/sqllib" 
+    log Run command on $host -- $command
+    $SSH $host "$command"
+    log ========================================================================
+done
+
+for host in {{$firstHost}}
+do
+    log "Create Db2 instance on $host" 
+    log ========================================================================
+    command="/opt/ibm/db2/$DB2VERSION/instance/db2icrt -s ese -a SERVER -p {{.Spec.DB2.Required.InstancePort}} -u {{.Spec.DB2.Required.FencedName}} {{.Spec.DB2.Required.InstanceName}}"
+    $SSH -tt $host "$command"
+    RC=$?
+done
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

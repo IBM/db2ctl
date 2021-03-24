@@ -1,0 +1,47 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+log ================================================
+log "Install Db2 license on all hosts"
+log ================================================
+
+DB2VERSION={{.Spec.DB2.Required.DB2Version}}
+
+# List generated using commands
+# ls -l /opt/ibm/db2/$DB2VERSION/bin | grep root | awk '{print $9}' | xargs readlink -f | paste -sd ", " -
+# ls -l /opt/ibm/db2/$DB2VERSION/instance | grep root | awk '{print $9}' | xargs readlink -f | paste -sd ", " -
+
+homeHost=$(hostname)
+cat << EOF > /tmp/install-db2-license
+#!/bin/bash
+    echo Remove existing license - Ignore if it gives error
+    /opt/ibm/db2/$DB2VERSION/adm/db2licm -r db2aese
+    echo "Apply license"
+    /opt/ibm/db2/$DB2VERSION/adm/db2licm -a /misc/nfsshare/db2ctl-download/{{.Spec.DB2.Required.DB2License}}
+    echo "List License"
+    /opt/ibm/db2/$DB2VERSION/adm/db2licm -l
+    exit
+EOF
+
+log "Command to install license"
+log ======================================================================== 
+cat /tmp/install-db2-license
+
+for host in {{.Spec.Nodes.Required.NamesAsList}}
+do
+    log Install Db2 license on $host 
+    log ======================================================================== 
+    $SSH -tt $host "/bin/bash -s" -- </tmp/install-db2-license
+done
+
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

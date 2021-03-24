@@ -1,0 +1,52 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+log ========================================================================
+log DRBD tuning - Enabling read-balancing
+log ========================================================================
+command="linstor resource-group drbd-options --read-balancing least-pending red2_NVME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+log DRBD tuning - Reduce meta-data write accesses
+log ========================================================================
+command="linstor resource-group drbd-options --al-extents 6433 red2_NVME"
+log Run command on {{$firstHost}} -- $command 
+$SSH {{$firstHost}} "$command"
+
+log DRBD tuning - Disable explicit flush operations - It was relevent to HDD
+log ======================================================================== 
+command="linstor resource-group drbd-options --disk-flushes no red2_NVME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+log DRBD tuning - meta-data write accesses - It was relevent to HDD
+log ========================================================================
+command="linstor resource-group drbd-options --md-flushes no red2_NVME"
+log Run command on {{$firstHost}} -- $command 
+$SSH {{$firstHost}} "$command"
+
+log DRBD tuning - Set max-buffers
+log ======================================================================== 
+command="linstor resource-group drbd-options --max-buffers 10000 red2_NVME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+log DRBD tuning - Set max-epoch-size
+log ======================================================================== 
+command="linstor resource-group drbd-options --max-epoch-size 10000 red2_NVME"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

@@ -1,0 +1,58 @@
+#!/bin/bash
+
+BASE=$(readlink -f $(dirname $0)/)
+SETENVSCRIPT=$BASE/00-set-env.sh
+source $SETENVSCRIPT
+
+start=$SECONDS
+
+{{$firstHost := getFirstHost .Spec.Nodes.Required.NamesAsList}}
+
+cat << 'EOF' > /tmp/pacemaker-status
+#!/bin/bash
+RESOURCES=$(crm_resource -l)
+for r in $RESOURCES
+do
+   echo show $r | crm -w resource
+done
+EOF
+
+log ======================================================================== 
+log "Wait for all resources to be running"
+log ======================================================================== 
+
+command="crm_mon -1Afr --group-by-node"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+i=0
+cnt=100
+while [ $i -lt $cnt ]
+do
+   log "Iteration $i/$cnt to wait for all resources to start"
+   $SSH {{$firstHost}} "$command" | grep -q "No inactive resource[s]"
+   if [ $? -eq 0 ] ; then
+      break
+   else
+      $SSH {{$firstHost}} "crm_resource -C"
+      sleep 1
+   fi   
+   i=$[$i+1]
+   log ======================================================================== 
+done
+
+$SSH {{$firstHost}} "/bin/bash -s" -- </tmp/pacemaker-status
+
+command="crm_mon -1Afr --group-by-node"
+log Run command on {{$firstHost}} -- $command
+$SSH {{$firstHost}} "$command"
+
+if [ "$i" -eq "$cnt" ] ; then 
+  RC=1
+fi
+
+log ========================================================================
+end=$SECONDS
+log $0 took $((end-start)) seconds to complete
+log ========================================================================
+exit $RC

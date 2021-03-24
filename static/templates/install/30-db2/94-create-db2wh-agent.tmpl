@@ -1,0 +1,483 @@
+#!/bin/bash
+cat << 'EOT' > /tmp/db2wh
+#!/bin/bash
+#
+# db2wh
+#
+# This agent incoporates code of a previous release created by
+# Alan Robertson and the community.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Version 0.0.1
+#######################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
+
+
+hostname=$OCF_RESKEY_hostname
+localhost=$(hostname | tr "." " " | awk '{print $1}')
+
+#######################################################################
+
+db2wh_usage()
+{
+   echo "db2wh start|stop|monitor"
+}
+
+db2wh_meta_data()
+{
+cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="db2">
+<version>1.0</version>
+<longdesc lang="en">
+</longdesc>
+<shortdesc lang="en">Resource Agent that monitors the db2 instance. It verifies the state of the instance (online/offline) and takes the required action to bring up the instance if needed.</shortdesc>
+
+<parameters>
+<parameter name="instance" required="1">
+<longdesc lang="en">
+The instance of the database(s).
+</longdesc>
+<shortdesc lang="en">instance</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+<parameter name="hostname" required="1">
+<longdesc lang="en">
+Local host name for resource.
+</longdesc>
+<shortdesc lang="en">host name</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+<parameter name="dbpartitionnum" unique="0" required="1">
+<longdesc lang="en">
+The number of the partition (DBPARTITIONNUM) to be managed.
+</longdesc>
+<shortdesc lang="en">database partition number (DBPARTITIONNUM)</shortdesc>
+<content type="string" default="0" />
+</parameter>
+</parameters>
+
+<actions>
+<action name="start" timeout="120s"/>
+<action name="stop" timeout="120s"/>
+<action name="monitor" depth="0" timeout="10s" interval="10s"/>
+<action name="meta-data" timeout="5s"/>
+</actions>
+</resource-agent>
+END
+}
+
+#
+# Run the given command as db2 instance user
+#
+runasdb2()
+{
+   su $instName -c "/bin/bash -c '. $instHome/sqllib/db2profile; $*'"
+}
+
+
+db2wh_validate_parameters()
+{
+   if [[ -z $OCF_RESKEY_instance ]]; then
+      ocf_log err "$__OCF_ACTION: $LINENO: Instance parameter not specified. db2wh_validate() exit with rc=$OCF_ERR_CONFIGURED."
+      return $OCF_ERR_CONFIGURED
+   fi
+   instName=$OCF_RESKEY_instance ;
+
+   if [[ -z $OCF_RESKEY_dbpartitionnum ]]; then
+      ocf_log err "$__OCF_ACTION: $LINENO: Partition number parameter not specified. db2wh_validate() exit with rc=$OCF_ERR_CONFIGURED."
+      return $OCF_ERR_CONFIGURED
+   fi
+   dbPartNum=$OCF_RESKEY_dbpartitionnum ;
+
+   if [[ -z ${instHome} ]] ; then
+      userhome=~${instName?}
+      eval userhome=$userhome
+      instHome=${userhome}
+   fi
+
+   # /etc/passwd will only contain the path to instance home dir for local users.
+   # If the user is defined in an authentication server, the ID will not exist in /etc/passwd.
+   firstChar=$(echo $instHome | cut -c1-1)
+   if [[ -z ${instHome} || "$firstChar" != "/" ]] ; then
+      instHome=$(cat /etc/passwd | grep "^${instName?}:" | cut -f 6 -d \:)
+   fi
+
+   if [[ -z ${instHome} ]] ; then
+      ocf_log warn "$__OCF_ACTION: $LINENO: There is no home directory defined for $instName"
+   else
+      instHome=${instHome#*=}
+      instHome=${instHome%%*( )}
+   fi
+
+   # get node number
+   local_host=`hostname -s`
+   nodeNum=`crm_node -l | grep -w $local_host | awk '{print $1}'`
+
+   db2sql=$instHome/sqllib
+   db2profile=$db2sql/db2profile
+   db2bin=$db2sql/bin
+   db2adm=$db2sql/adm
+   db2nodescfg=$instHome/sqllib/db2nodes.cfg
+
+   nln=$(grep -v "^[ ]*$" $db2nodescfg | wc -l | awk '{print $1}')
+}
+
+db2wh_validate_binaries()
+{
+   while :
+   do
+      #  Make sure the key executables are here.
+      if ! [ -d "$db2sql" -a -d "$db2adm" -a -d "$db2bin" -a -f "$db2profile" ]
+      then
+         if [ ocf_is_probe ]; then
+            rc=$OCF_NOT_RUNNING
+            ocf_log err "$__OCF_ACTION: $LINENO: This is invoked as a probe with a monitor interval of 0. db2wh_validate() exit with rc=$rc."
+            #exit $rc
+            sleep 10
+            continue;
+         fi
+
+         rc=$OCF_ERR_INSTALLED
+         ocf_log err "$__OCF_ACTION: $LINENO: Db2 required directories and/or files not found. db2wh_validate() exit with rc=$rc."
+         sleep 10
+         #exit $rc
+      else
+         break
+      fi
+   done
+}
+
+
+#--------------------------------------------------------
+#
+# db2wh_validate()
+#
+#--------------------------------------------------------
+db2wh_validate()
+{
+   ocf_log debug "$__OCF_ACTION: $LINENO: db2wh_validate() entry. OCF_RESKEY_instance=\"$OCF_RESKEY_instance\", instHome=\"$instHome\", OCF_RESKEY_dbpartitionnum=\"$OCF_RESKEY_dbpartitionnum\""
+
+   db2wh_validate_parameters
+   db2wh_validate_binaries
+
+   ocf_log debug "$__OCF_ACTION: $LINENO: db2wh_validate() exit. instName=\"$instName\", userhome=\"$userhome\", instHome=\"$instHome\", dbPartNum=\"$dbPartNum\""
+}
+
+
+#--------------------------------------------------------
+#
+# db2wh_startPartitionOnThisNode()
+#
+#--------------------------------------------------------
+db2wh_startPartitionOnThisNode()
+{
+   ocf_log info "$__OCF_ACTION: $LINENO: $instName: Attempting to start partition($dbPartNum) via db2gcf..."
+
+   ((sato=nln*2+60))
+   runasdb2 "$db2bin/db2gcf -t $sato -u -p $dbPartNum -i $instName -L"
+   rcg=$?
+   ocf_log info "$__OCF_ACTION: $LINENO: $instName: Start via db2gcf returned rc=$rcg."
+}
+
+#--------------------------------------------------------
+#
+# db2wh_start()
+#
+#--------------------------------------------------------
+db2wh_start()
+{
+   ocf_log info "$__OCF_ACTION: $LINENO: $instName: db2wh_start() entry."
+
+   db2wh_monitor
+   if [ $? -eq $OCF_SUCCESS ]; then
+      rc=$OCF_SUCCESS
+      ocf_log info "$__OCF_ACTION: $LINENO: Db2 instance '$instName', partition '$dbPartNum' is already running."
+   else
+
+      if [[ -z $instHome/sqllib/bin/db2gcf ]]; then
+         rcg=$OCF_ERR_GENERIC
+         ocf_log err "$__OCF_ACTION: $LINENO: $instName: Cannot find executable $instHome/sqllib/bin/db2gcf. db2wh_start() exit with rc=$rcg."
+         return $rcg
+      fi
+
+      # Start db2 on this node
+      rc=$OCF_ERR_GENERIC
+      rcg=$OCF_ERR_GENERIC
+
+      db2wh_startPartitionOnThisNode
+      db2wh_monitor
+      rc=$?
+
+      if [ $rc -ne $OCF_SUCCESS -o $rcg -ne $OCF_SUCCESS ]; then
+         ocf_log notice "$__OCF_ACTION: $LINENO: $instName: Attempt to start instance with partition number \"$dbPartNum\" failed with rc=$rc, rcg=$rcg."
+         ocf_log warn "$__OCF_ACTION: $LINENO: $instName: db2wh_start() exit with rc=$OCF_ERR_GENERIC."
+         return $OCF_ERR_GENERIC
+      fi
+   
+      #while [ $rc -ne $OCF_SUCCESS -o $rcg -ne $OCF_SUCCESS ]; do
+         # db2wh_startPartitionOnThisNode
+         # db2wh_monitor
+         # rc=$?
+
+         # # $rcg is returned by db2wh_startPartitionOnThisNode
+         # if [ $rc -ne $OCF_SUCCESS -o $rcg -ne $OCF_SUCCESS ]; then
+         #    ocf_log notice "$__OCF_ACTION: $LINENO: $instName: Attempt to start instance with partition number \"$dbPartNum\" failed with rc=$rc, rcg=$rcg. Performing cleanup."
+         #    pidsToKill=$(ps -o pid,comm -u $instName | grep "db2[a-z]" | egrep -v "db2gcf|db2cm" | awk '{print $1}')
+
+         #    # Replace newline characters(#012) with space
+         #    pidsToKill=${pidsToKill//$'\012'/ }
+         #    ocf_log notice "$__OCF_ACTION: $LINENO: Killing PIDs \"$pidsToKill\""
+            
+         #    if [ ! -z "$pidsToKill" ] ; then
+         #       kill -9 $pidsToKill
+         #    fi
+
+         #    nip=$(ps -fu $instName | grep -c "ipclean" )
+         #    if [[ $nip -eq 0 ]] ; then
+         #       ocf_log notice "$__OCF_ACTION: $LINENO: $instName: Removing IPCs"
+         #       runasdb2 "$db2bin/ipclean -a"
+         #    fi
+
+         #    local nnnn
+         #    nnnn=$dbPartNum
+         #    rm -f $instHome/sqllib/ctrl/db2stst.${nnnn?}
+         #    # Will retry start ... sleep for a bit to prevent pegging CPU
+         #    sleep 30
+         # fi
+      #done
+   fi
+
+   ocf_log info "$__OCF_ACTION: $LINENO: $instName: db2wh_start() exit with rc=$OCF_SUCCESS."
+   return $OCF_SUCCESS
+}
+
+
+#--------------------------------------------------------
+#
+# db2wh_stop()
+#
+#--------------------------------------------------------
+db2wh_stop()
+{
+   ocf_log info "$__OCF_ACTION: $LINENO: $instName: db2wh_stop() entry. instHome=\"$instHome\", dbPartNum=\"$dbPartNum\"."
+
+   ret=1
+   counter=0
+
+   while [ $counter -le 20 ]
+   do
+      # Ensure home directory is accessible ...
+      if [[ ! -z ${instHome} ]] ; then
+
+         # This is not actually checking if db2gcf exists or not, it is a way for us to check
+         # if the mount is hanging or not. And it is important to not cause any hangs in stop
+         # since it can lead to a failover to never happen.
+         #/bin/bash -c "cd $instHome/sqllib/bin; touch $instHome/sqllib/tmp/.tmp.$dbPartNum; rm -f $instHome/sqllib/tmp/.tmp.$dbPartNum" &
+         /bin/bash -c "test -e $instHome/sqllib/bin/db2gcf" &
+         ProcNum=$!
+         sleep 2
+
+         if [ ! -z "$ProcNum" ] ; then
+            kill -0 ${ProcNum} 2> /dev/null
+            ret=$?
+            kill -9 ${ProcNum} 2> /dev/null
+         fi
+
+         if [[ $ret == 0 ]]; then
+            ocf_log warn "$__OCF_ACTION: $LINENO: $instName: $instHome may not be accessible. Retry count: $counter"
+         else
+            break
+         fi
+      else
+         break
+      fi
+      sleep 8
+	   counter=$(( counter+1 ))
+   done
+
+   if [[ -z ${instHome} || $ret == 0 ]] ; then
+
+      pidsToKill=$(ps -o pid,comm -u $instName | grep "db2[a-z]" | awk '{print $1}')
+
+      # Replace newline characters(#012) with space
+      pidsToKill=${pidsToKill//$'\012'/ }
+
+      rc=$OCF_SUCCESS
+      if [ ! -z "$pidsToKill" ] ; then
+         kill -9 $pidsToKill
+         rc=$?
+      fi
+
+      ocf_log warn "$__OCF_ACTION: $LINENO: $instName: Instance home directory is either unretrievable or inaccessible. Killing PIDs=\"$pidsToKill\" returns rc=$rc. db2wh_stop() exit with rc=$OCF_SUCCESS."
+      return $OCF_SUCCESS
+   fi
+   
+   # Do not need to stop if no process model
+   p_pid=$(ps -u ${instName?} -o args | grep -c "^db2sysc ${dbPartNum?}[ ]*$")
+
+   # This is may not be required
+   if [[ $p_pid == 0 && $dbPartNum == 0 ]]; then
+      p_pid=$(ps -u ${DB2INSTANCE?} -o args | grep -v "^db2sysc [0-9]" | grep -c "^db2sysc")
+   fi
+
+   if [[ $p_pid == 0 ]]; then
+      ocf_log info "$__OCF_ACTION: $LINENO: $instName: Partition \"$dbPartNum\" already stopped. db2wh_stop() exit with rc=$OCF_SUCCESS."
+      return $OCF_SUCCESS
+   fi
+
+   runasdb2 "$db2bin/db2gcf -t 100 -d -p ${dbPartNum?} -i ${instName?} -L"
+   rc=$?
+
+   if [[ $rc != 0 ]]; then
+
+      ocf_log info "$__OCF_ACTION: $LINENO: $instName: db2gcf returned error rc=$rc."
+
+      pidsToKill=$(ps -o pid,comm -u $instName | grep "db2[a-z]" | awk '{print $1}')
+      pidsToKill=${pidsToKill//$'\012'/ }
+      ocf_log notice "$__OCF_ACTION: $LINENO: Performing cleanup for $instName, $dbPartNum. Killing PIDs=\"$pidsToKill\"."
+
+      if [ ! -z "$pidsToKill" ] ; then
+         kill -9 $pidsToKill
+      fi
+
+      runasdb2 "$db2bin/db2gcf -t 10 -k -p ${dbPartNum?} -i ${instName?};ipclean -a"
+      rc=0
+   fi
+
+   ocf_log info "$__OCF_ACTION: $LINENO: db2wh_stop() exit with rc=0."
+   return $OCF_SUCCESS
+}
+
+
+#--------------------------------------------------------
+#
+# db2wh_monitor()
+#
+#--------------------------------------------------------
+db2wh_monitor()
+{
+   local rc
+
+   ocf_log debug "$__OCF_ACTION: $LINENO: db2wh_monitor() entry."
+
+   if [ ! -z $hostname ] && [ $localhost != $hostname ]; then
+      ocf_log debug "$__OCF_ACTION: $LINENO: Hostname \"$hostname\" is not same as localhost name \"$localhost\"."
+   fi
+
+   # Use ps to monitor if db2sysc is up
+   retryCount=0 ;
+   retry_ps=1 ;
+   MAX_RETRIES=5 ;
+
+   while [[ $retry_ps -eq 1 && $retryCount -lt $MAX_RETRIES ]];
+   do
+      retry_ps=0 ;
+      p_out=$(ps -u ${instName?} -o args | egrep "^db2sysc ${dbPartNum?}[ ]*$|^db2sysc[ ]*$|^\[db2sysc\]"| grep -v defunct) ;
+      p_pid=$(echo $p_out | grep -c "db2sysc ${dbPartNum?}") ;
+
+      if [[ $p_pid == 0 && $dbPartNum -eq 0 ]]; then
+         p_pid=$(echo $p_out | grep -v "\[db2sysc\]" | grep -c "db2sysc") ;
+      fi
+
+      if [[ $p_pid == 0 ]]; then
+         p_pid=$(echo $p_out | grep -c "\[db2sysc\]") ;
+         if [[ $p_pid != 0 ]]; then
+            ocf_log warn "$__OCF_ACTION: $LINENO: ps returns $p_pid, retrying ps: retryCount=$retryCount out of $MAX_RETRIES" ;
+            retryCount=$((${retryCount}+1)) ;
+            retry_ps=1 ;
+            sleep 5 ;
+         fi
+         rc=$OCF_ERR_GENERIC
+      else
+        rc=$OCF_SUCCESS
+      fi
+   done
+
+   if [[ $retryCount -eq $MAX_RETRIES ]]; then
+      # If we are here, we maxed out the loop checking for db2sysc process
+      rc=$OCF_ERR_GENERIC
+      ocf_log warn "$__OCF_ACTION: $LINENO: ps did not list any process for db2sysc on node $dbPartNum after $MAX_RETRIES retries. db2wh_monitor() exit with rc=$rc." ;
+      return $rc
+   fi
+
+   if [[ $rc == $OCF_SUCCESS ]]; then
+      ocf_log debug "$__OCF_ACTION: $LINENO: db2wh_monitor() exit with rc=$rc." ;
+   else
+
+      p_pid=$(ps -e -o args | grep -c "^db2wdog [0-9]\+ [0-9]\+")
+      if [[ $p_pid > 0 ]]; then
+          DB2_CLEANUP_TIME=30
+          ocf_log info "$__OCF_ACTION: $LINENO: db2wh_monitor() DB2 cleaning up: sleep $DB2_CLEANUP_TIME seconds ($instName, $dbPartNum)"
+          sleep $DB2_CLEANUP_TIME
+      fi
+
+      ocf_log warn "$__OCF_ACTION: $LINENO: db2wh_monitor() exit with rc=$rc." ;
+   fi
+
+   return $rc
+}
+
+########
+# Main #
+########
+case "$__OCF_ACTION" in
+    meta-data)
+    db2wh_meta_data
+    exit $OCF_SUCCESS
+    ;;
+
+    usage)
+    db2wh_usage
+    exit $OCF_SUCCESS
+    ;;
+
+    start)
+    db2wh_validate
+    db2wh_start
+    exit $?
+    ;;
+
+    stop)
+    #db2wh_validate
+    db2wh_validate_parameters
+    db2wh_stop
+    exit $?
+    ;;
+
+    monitor)
+    #db2wh_validate
+    db2wh_validate_parameters
+    db2wh_monitor
+    exit $?
+    ;;
+
+    *)
+    db2wh_usage
+    exit $OCF_ERR_UNIMPLEMENTED
+esac
+EOT
